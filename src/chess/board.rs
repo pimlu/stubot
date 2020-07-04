@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::types;
+
 // row major
 pub const BOARD_DIM: (usize, usize) = (8, 8);
 
