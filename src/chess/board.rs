@@ -1,9 +1,11 @@
 use std::fmt;
+use std::ops;
 
+use super::*;
 use crate::types;
 
 // row major
-pub const BOARD_DIM: (usize, usize) = (8, 8);
+pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Color {
@@ -71,10 +73,24 @@ impl fmt::Display for Sq {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct State {
     turn: Color,
-    board: [[Sq; BOARD_DIM.1]; BOARD_DIM.0],
+    board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
     castle: [[bool; 2]; 2],
     enpassant: i8,
 }
+
+impl ops::Index<Pos> for State {
+    type Output = Sq;
+    fn index(&self, i: Pos) -> &Self::Output {
+        &self.board[i.y as usize][i.x as usize]
+    }
+}
+
+impl ops::IndexMut<Pos> for State {
+    fn index_mut(&mut self, i: Pos) -> &mut Self::Output {
+        &mut self.board[i.y as usize][i.x as usize]
+    }
+}
+
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
@@ -91,7 +107,7 @@ impl fmt::Display for State {
 
 impl State {
     pub fn init_board() -> State {
-        const W: usize = BOARD_DIM.1;
+        const W: usize = BOARD_DIM.x as usize;
 
         let make_set = |c, ts: [Type; W]| {
             let mut squares = [Sq::NIL; W];
