@@ -6,7 +6,7 @@ pub struct Pos {
     pub x: i8,
 }
 
-mod Dir {
+mod dir {
     use super::Pos;
     const N: Pos = Pos { x: 0, y: 1 };
     const E: Pos = Pos { x: 1, y: 0 };
@@ -23,6 +23,22 @@ impl ops::Add<Pos> for Pos {
         }
     }
 }
+impl ops::Neg for Pos {
+    type Output = Pos;
+    fn neg(self) -> Pos {
+        Pos {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
+}
+impl ops::Sub<Pos> for Pos {
+    type Output = Pos;
+    fn sub(self, _rhs: Pos) -> Pos {
+        self + -_rhs
+    }
+}
+
 pub struct Move {
     pub a: Pos,
     pub b: Pos,

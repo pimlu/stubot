@@ -37,12 +37,12 @@ impl fmt::Display for Type {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Piece {
-    c: Color,
-    t: Type,
+    pub c: Color,
+    pub t: Type,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Sq(Option<Piece>);
+pub struct Sq(pub Option<Piece>);
 impl Sq {
     fn new(c: Color, t: Type) -> Sq {
         return Sq(Some(Piece { c: c, t: t }));
@@ -78,19 +78,6 @@ pub struct State {
     enpassant: i8,
 }
 
-impl ops::Index<Pos> for State {
-    type Output = Sq;
-    fn index(&self, i: Pos) -> &Self::Output {
-        &self.board[i.y as usize][i.x as usize]
-    }
-}
-
-impl ops::IndexMut<Pos> for State {
-    fn index_mut(&mut self, i: Pos) -> &mut Self::Output {
-        &mut self.board[i.y as usize][i.x as usize]
-    }
-}
-
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
@@ -106,6 +93,11 @@ impl fmt::Display for State {
 }
 
 impl State {
+    pub fn get(&self, i: Pos) -> Option<&Sq> {
+        self.board
+            .get(i.y as usize)
+            .and_then(|r| r.get(i.x as usize))
+    }
     pub fn init_board() -> State {
         const W: usize = BOARD_DIM.x as usize;
 
