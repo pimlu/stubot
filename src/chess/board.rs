@@ -1,5 +1,4 @@
 use std::fmt;
-use std::ops;
 
 use super::*;
 use crate::types;
@@ -72,10 +71,10 @@ impl fmt::Display for Sq {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct State {
-    turn: Color,
-    board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
-    castle: [[bool; 2]; 2],
-    enpassant: i8,
+    pub turn: Color,
+    pub board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
+    pub castle: [[bool; 2]; 2],
+    pub enpassant: i8,
 }
 
 impl fmt::Display for State {
