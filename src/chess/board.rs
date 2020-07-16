@@ -71,7 +71,7 @@ impl fmt::Display for Sq {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct State {
-    pub turn: Color,
+    ply: i32,
     pub board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
     pub castle: [[bool; 2]; 2],
     pub enpassant: i8,
@@ -97,7 +97,17 @@ impl State {
             .get(i.y as usize)
             .and_then(|r| r.get(i.x as usize))
     }
-    pub fn init_board() -> State {
+    pub fn turn(&self) -> Color {
+        if self.ply % 2 == 0 {
+            Color::White
+        } else {
+            Color::Black
+        }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
         const W: usize = BOARD_DIM.x as usize;
 
         let make_set = |c, ts: [Type; W]| {
@@ -126,7 +136,7 @@ impl State {
         let empty = [Sq::NIL; W];
 
         return State {
-            turn: Color::White,
+            ply: 0,
             board: [
                 make_backline(Color::White),
                 make_pawns(Color::White),

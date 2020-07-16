@@ -2,10 +2,6 @@ use super::card;
 use super::*;
 use crate::types;
 
-struct BoardHistory {
-    history: Vec<State>,
-}
-
 fn rider(orig: Pos, options: &'static [Pos], mut f: impl FnMut(Pos) -> bool) {
     for dir in options {
         let mut pos = orig + *dir;
@@ -43,6 +39,15 @@ const ROOK_OPTS: &[Pos] = &[
     Pos { x: 0, y: 1 },
     Pos { x: 0, y: -1 },
 ];
+// Everything but left and right (which are special)
+const KING_OPTS: &[Pos] = &[
+    Pos { x: 1, y: 1 },
+    Pos { x: 1, y: -1 },
+    Pos { x: -1, y: 1 },
+    Pos { x: -1, y: -1 },
+    Pos { x: 0, y: 1 },
+    Pos { x: 0, y: -1 },
+];
 
 impl types::MoveGen for State {
     type Move = Move;
@@ -59,7 +64,7 @@ impl types::MoveGen for State {
                 }
                 None => return false,
             };
-            if *c != self.turn {
+            if *c != self.turn() {
                 moves.push(mv);
             }
             return false;
@@ -67,7 +72,7 @@ impl types::MoveGen for State {
         // take or move-only moves for pawns. returns whether it could move
         let special_move = |moves: &mut Vec<Move>, orig, pos, is_take: bool| {
             let mv = Move { a: orig, b: pos };
-            let Piece { c, t } = match self.get(pos) {
+            let Piece { c, t: _ } = match self.get(pos) {
                 Some(Sq(Some(p))) => p,
                 Some(Sq(None)) => {
                     if !is_take {
@@ -77,7 +82,7 @@ impl types::MoveGen for State {
                 }
                 None => return false,
             };
-            if *c != self.turn && is_take {
+            if *c != self.turn() && is_take {
                 moves.push(mv);
                 return true;
             }
@@ -94,7 +99,7 @@ impl types::MoveGen for State {
                 Sq(Some(p)) => p,
                 Sq(None) => return,
             };
-            if *c != self.turn {
+            if *c != self.turn() {
                 return;
             }
             let try_m = |pos| try_move(&mut moves, orig, pos);
@@ -127,8 +132,7 @@ impl types::MoveGen for State {
                     rider(orig, ROOK_OPTS, try_m);
                 }
                 Type::King => {
-                    leaper(orig, BISHOP_OPTS, try_m);
-                    leaper(orig, ROOK_OPTS, try_m);
+                    leaper(orig, KING_OPTS, try_m);
                 }
             }
         };
