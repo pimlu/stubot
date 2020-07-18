@@ -2,7 +2,12 @@ use super::card;
 use super::*;
 use crate::types;
 
-fn rider(orig: Pos, options: &'static [Pos], mut f: impl FnMut(Pos) -> bool) {
+// no trait aliases yet
+trait PosCb: FnMut(Pos) -> bool {}
+
+impl<T: FnMut(Pos) -> bool> PosCb for T {}
+
+fn rider(orig: Pos, options: &'static [Pos], mut f: impl PosCb) {
     for dir in options {
         let mut pos = orig + *dir;
         while f(pos) {
@@ -10,7 +15,7 @@ fn rider(orig: Pos, options: &'static [Pos], mut f: impl FnMut(Pos) -> bool) {
         }
     }
 }
-fn leaper(orig: Pos, options: &'static [Pos], mut f: impl FnMut(Pos) -> bool) {
+fn leaper(orig: Pos, options: &'static [Pos], mut f: impl PosCb) {
     for dir in options {
         f(orig + *dir);
     }
@@ -49,50 +54,53 @@ const KING_OPTS: &[Pos] = &[
     Pos { x: 0, y: -1 },
 ];
 
+impl State {
+    // pushes the move if there is space, returns whether ray should cont.
+    fn try_move(&self, moves: &mut Vec<Move>, orig: Pos, pos: Pos) -> bool {
+        let mv = Move { a: orig, b: pos };
+        let Piece { c, t: _ } = match self.get(pos) {
+            Some(Sq(Some(p))) => p,
+            Some(Sq(None)) => {
+                moves.push(mv);
+                return true;
+            }
+            None => return false,
+        };
+        if *c != self.turn() {
+            moves.push(mv);
+        }
+        return false;
+    }
+
+    // take or move-only moves for pawns. returns whether it could move
+    fn special_move(&self, moves: &mut Vec<Move>, orig: Pos, pos: Pos, is_take: bool) -> bool {
+        let mv = Move { a: orig, b: pos };
+        let Piece { c, t: _ } = match self.get(pos) {
+            Some(Sq(Some(p))) => p,
+            Some(Sq(None)) => {
+                if !is_take {
+                    moves.push(mv);
+                }
+                return !is_take;
+            }
+            None => return false,
+        };
+        if *c != self.turn() && is_take {
+            moves.push(mv);
+            return true;
+        }
+        return false;
+    }
+}
+
 impl types::MoveGen for State {
     type Move = Move;
     fn get_moves(&self) -> Vec<Self::Move> {
         let mut moves = Vec::<Move>::new();
-        // pushes the move if there is space, returns whether ray should cont.
-        let try_move = |moves: &mut Vec<Move>, orig, pos| {
-            let mv = Move { a: orig, b: pos };
-            let Piece { c, t: _ } = match self.get(pos) {
-                Some(Sq(Some(p))) => p,
-                Some(Sq(None)) => {
-                    moves.push(mv);
-                    return true;
-                }
-                None => return false,
-            };
-            if *c != self.turn() {
-                moves.push(mv);
-            }
-            return false;
-        };
-        // take or move-only moves for pawns. returns whether it could move
-        let special_move = |moves: &mut Vec<Move>, orig, pos, is_take: bool| {
-            let mv = Move { a: orig, b: pos };
-            let Piece { c, t: _ } = match self.get(pos) {
-                Some(Sq(Some(p))) => p,
-                Some(Sq(None)) => {
-                    if !is_take {
-                        moves.push(mv);
-                    }
-                    return !is_take;
-                }
-                None => return false,
-            };
-            if *c != self.turn() && is_take {
-                moves.push(mv);
-                return true;
-            }
-            return false;
-        };
-
         let mut add_moves = |orig| {
             macro_rules! special_move {
                 ($dir:expr, $is_take:expr) => {
-                    special_move(&mut moves, orig, orig + $dir, $is_take);
+                    self.special_move(&mut moves, orig, orig + $dir, $is_take);
                 };
             }
             let Piece { c, t } = match self.get(orig).unwrap() {
@@ -102,7 +110,7 @@ impl types::MoveGen for State {
             if *c != self.turn() {
                 return;
             }
-            let try_m = |pos| try_move(&mut moves, orig, pos);
+            let try_m = |pos| self.try_move(&mut moves, orig, pos);
 
             match *t {
                 Type::Pawn => {
@@ -129,7 +137,7 @@ impl types::MoveGen for State {
                 Type::Rook => rider(orig, ROOK_OPTS, try_m),
                 Type::Queen => {
                     rider(orig, BISHOP_OPTS, try_m);
-                    rider(orig, ROOK_OPTS, try_m);
+                    //rider(orig, ROOK_OPTS, try_m);
                 }
                 Type::King => {
                     leaper(orig, KING_OPTS, try_m);

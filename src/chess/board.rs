@@ -1,7 +1,6 @@
 use std::fmt;
 
 use super::*;
-use crate::types;
 
 // row major
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
