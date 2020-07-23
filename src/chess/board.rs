@@ -5,21 +5,6 @@ use super::*;
 // row major
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Color {
-    White,
-    Black,
-}
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Type {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-}
-
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -31,12 +16,6 @@ impl fmt::Display for Type {
             Type::King => write!(f, "K"),
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Piece {
-    pub c: Color,
-    pub t: Type,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -91,11 +70,18 @@ impl fmt::Display for State {
 }
 
 impl State {
+    // 2d array idx at pos
     pub fn get(&self, i: Pos) -> Option<&Sq> {
         self.board
             .get(i.y as usize)
             .and_then(|r| r.get(i.x as usize))
     }
+    pub fn get_mut(&mut self, i: Pos) -> Option<&mut Sq> {
+        self.board
+            .get_mut(i.y as usize)
+            .and_then(|r| r.get_mut(i.x as usize))
+    }
+    // every other turn, 0 starts at white.
     pub fn turn(&self) -> Color {
         if self.ply % 2 == 0 {
             Color::White
@@ -103,6 +89,21 @@ impl State {
             Color::Black
         }
     }
+    // in-place make move
+    pub fn make_move(&mut self, mv: Move) {
+        let Piece { c, t } = match self.get(mv.a) {
+            Some(Sq(Some(p))) => p,
+            _ => panic!("bad spot a"),
+        };
+
+        debug_assert!(*c == self.turn());
+
+        let b_sq = match self.get(mv.b) {
+            Some(sq) => sq,
+            None => panic!("bad spot b"),
+        };
+    }
+    pub fn unmake_move(&mut self) {}
 }
 
 impl Default for State {

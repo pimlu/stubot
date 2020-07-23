@@ -1,7 +1,7 @@
 mod board;
-mod move_t;
 mod rules;
+mod structs;
 
 pub use board::*;
-pub use move_t::*;
 pub use rules::*;
+pub use structs::*;

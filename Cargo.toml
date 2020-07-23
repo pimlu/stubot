@@ -10,3 +10,7 @@ edition = "2018"
 version = "0.99.0"
 default-features = false
 features = ["add", "add_assign", "into", "from", "not"]
+
+[dependencies]
+num-traits = "0.2"
+num-derive = "0.3"

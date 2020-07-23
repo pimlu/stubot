@@ -1,11 +1,12 @@
 use super::card;
 use super::*;
-use crate::types;
 
 // no trait aliases yet
 trait PosCb: FnMut(Pos) -> bool {}
+trait MoveCb: FnMut(Move) {}
 
 impl<T: FnMut(Pos) -> bool> PosCb for T {}
+impl<T: FnMut(Move)> MoveCb for T {}
 
 fn rider(orig: Pos, options: &'static [Pos], mut f: impl PosCb) {
     for dir in options {
@@ -53,50 +54,78 @@ const KING_OPTS: &[Pos] = &[
     Pos { x: 0, y: 1 },
     Pos { x: 0, y: -1 },
 ];
+pub enum MvType {
+    Capture(Piece),
+    EnpCap(Piece),
+}
+pub struct MvMeta {
+    mv: Move,
+    p: Piece,
+    cap: Option<Piece>,
+    score: i16,
+}
 
 impl State {
+    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
+        self.make_move(mv);
+
+        self.unmake_move();
+    }
     // pushes the move if there is space, returns whether ray should cont.
-    fn try_move(&self, moves: &mut Vec<Move>, orig: Pos, pos: Pos) -> bool {
-        let mv = Move { a: orig, b: pos };
+    fn try_move(&mut self, moves: &mut Vec<MvMeta>, orig: Pos, pos: Pos) -> bool {
+        let mv = Move {
+            a: orig,
+            b: pos,
+            extra: None,
+        };
         let Piece { c, t: _ } = match self.get(pos) {
             Some(Sq(Some(p))) => p,
             Some(Sq(None)) => {
-                moves.push(mv);
+                self.add_sudo(moves, mv);
                 return true;
             }
             None => return false,
         };
         if *c != self.turn() {
-            moves.push(mv);
+            self.add_sudo(moves, mv);
         }
         return false;
     }
 
     // take or move-only moves for pawns. returns whether it could move
-    fn special_move(&self, moves: &mut Vec<Move>, orig: Pos, pos: Pos, is_take: bool) -> bool {
-        let mv = Move { a: orig, b: pos };
+    fn special_move(
+        &mut self,
+        moves: &mut Vec<MvMeta>,
+        orig: Pos,
+        pos: Pos,
+        is_take: bool,
+    ) -> bool {
+        let mv = Move {
+            a: orig,
+            b: pos,
+            extra: None,
+        };
         let Piece { c, t: _ } = match self.get(pos) {
             Some(Sq(Some(p))) => p,
             Some(Sq(None)) => {
                 if !is_take {
-                    moves.push(mv);
+                    self.add_sudo(moves, mv);
                 }
                 return !is_take;
             }
             None => return false,
         };
         if *c != self.turn() && is_take {
-            moves.push(mv);
+            self.add_sudo(moves, mv);
             return true;
         }
         return false;
     }
-}
 
-impl types::MoveGen for State {
-    type Move = Move;
-    fn get_moves(&self) -> Vec<Self::Move> {
-        let mut moves = Vec::<Move>::new();
+    // requires a mutable reference, but doesn't actually modify anything
+    // (if our code is correct)
+    pub fn get_moves(&mut self) -> Vec<MvMeta> {
+        let mut moves = Vec::<MvMeta>::new();
         let mut add_moves = |orig| {
             macro_rules! special_move {
                 ($dir:expr, $is_take:expr) => {
