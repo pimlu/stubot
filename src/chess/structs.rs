@@ -25,8 +25,8 @@ pub enum CastleSide {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Piece {
-    pub c: Color,
-    pub t: Type,
+    pub clr: Color,
+    pub typ: Type,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Add, AddAssign, Sub, SubAssign, Neg, From, Into)]
@@ -44,8 +44,9 @@ pub mod card {
 }
 
 pub enum MvExtra {
+    EnPassant,
     Castle(CastleSide),
-    Promote(Piece),
+    Promote(Type),
 }
 
 pub struct Move {

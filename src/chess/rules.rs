@@ -54,14 +54,10 @@ const KING_OPTS: &[Pos] = &[
     Pos { x: 0, y: 1 },
     Pos { x: 0, y: -1 },
 ];
-pub enum MvType {
-    Capture(Piece),
-    EnpCap(Piece),
-}
 pub struct MvMeta {
     mv: Move,
     p: Piece,
-    cap: Option<Piece>,
+    cap: Option<Type>,
     score: i16,
 }
 
@@ -78,15 +74,15 @@ impl State {
             b: pos,
             extra: None,
         };
-        let Piece { c, t: _ } = match self.get(pos) {
-            Some(Sq(Some(p))) => p,
+        let Piece { clr, typ: _ } = match self.get(pos) {
+            Some(Sq(Some(pc))) => *pc,
             Some(Sq(None)) => {
                 self.add_sudo(moves, mv);
                 return true;
             }
             None => return false,
         };
-        if *c != self.turn() {
+        if clr != self.turn() {
             self.add_sudo(moves, mv);
         }
         return false;
@@ -105,8 +101,8 @@ impl State {
             b: pos,
             extra: None,
         };
-        let Piece { c, t: _ } = match self.get(pos) {
-            Some(Sq(Some(p))) => p,
+        let Piece { clr, typ: _ } = match self.get(pos) {
+            Some(Sq(Some(pc))) => *pc,
             Some(Sq(None)) => {
                 if !is_take {
                     self.add_sudo(moves, mv);
@@ -115,7 +111,7 @@ impl State {
             }
             None => return false,
         };
-        if *c != self.turn() && is_take {
+        if clr != self.turn() && is_take {
             self.add_sudo(moves, mv);
             return true;
         }
@@ -132,23 +128,23 @@ impl State {
                     self.special_move(&mut moves, orig, orig + $dir, $is_take);
                 };
             }
-            let Piece { c, t } = match self.get(orig).unwrap() {
-                Sq(Some(p)) => p,
+            let Piece { clr, typ } = match self.get(orig).unwrap() {
+                Sq(Some(pc)) => *pc,
                 Sq(None) => return,
             };
-            if *c != self.turn() {
+            if clr != self.turn() {
                 return;
             }
-            let try_m = |pos| self.try_move(&mut moves, orig, pos);
+            let try_m = |pos| false; //self.try_move(&mut moves, orig, pos);
 
-            match *t {
+            match typ {
                 Type::Pawn => {
                     let home_row = orig.y
-                        == match *c {
+                        == match clr {
                             Color::White => 1,
                             Color::Black => 6,
                         };
-                    let dir = match *c {
+                    let dir = match clr {
                         Color::White => card::N,
                         Color::Black => card::S,
                     };
