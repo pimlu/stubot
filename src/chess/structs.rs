@@ -43,12 +43,14 @@ pub mod card {
     pub const W: Pos = Pos { x: -1, y: 0 };
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MvExtra {
     EnPassant,
     Castle(CastleSide),
     Promote(Type),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Move {
     pub a: Pos,
     pub b: Pos,

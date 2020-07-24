@@ -48,11 +48,37 @@ impl fmt::Display for Sq {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub struct StateExtra {
+    castle: [[bool; 2]; 2],
+    pub capture: Option<Type>,
+    pub enp: i8,
+}
+
+// am I actually going to bitpack this later? probably not
+impl StateExtra {
+    pub fn get_castle(&self, clr: Color, side: CastleSide) -> &bool {
+        &self.castle[clr as usize][side as usize]
+    }
+    pub fn set_castle(&mut self, clr: Color, side: CastleSide, state: bool) {
+        self.castle[clr as usize][side as usize] = state;
+    }
+}
+
+impl Default for StateExtra {
+    fn default() -> Self {
+        StateExtra {
+            capture: None,
+            castle: [[true, true], [true, true]],
+            enp: -1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct State {
-    ply: i32,
-    pub board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
-    pub castle: [[bool; 2]; 2],
-    pub enpassant: i8,
+    ply: u32,
+    board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
+    extra: Vec<StateExtra>,
 }
 
 impl fmt::Display for State {
@@ -69,6 +95,15 @@ impl fmt::Display for State {
     }
 }
 
+// gets the position of the taken pawn from en passant
+fn en_passant_cap(mv: Move) -> Pos {
+    // x/col of dest sq, y/row of src sq
+    Pos {
+        x: mv.b.x,
+        y: mv.a.x,
+    }
+}
+
 impl State {
     // 2d array idx at pos
     pub fn get(&self, i: Pos) -> Option<&Sq> {
@@ -76,59 +111,84 @@ impl State {
             .get(i.y as usize)
             .and_then(|r| r.get(i.x as usize))
     }
-    pub fn get_mut(&mut self, i: Pos) -> Option<&mut Sq> {
+    fn get_mut(&mut self, i: Pos) -> Option<&mut Sq> {
         self.board
             .get_mut(i.y as usize)
             .and_then(|r| r.get_mut(i.x as usize))
     }
+    pub fn idx(&self, i: Pos) -> &Sq {
+        self.get(i).unwrap()
+    }
+    fn set(&mut self, i: Pos, x: Sq) {
+        let sq = self.get_mut(i).unwrap();
+        *sq = x;
+    }
+    pub fn score(&self) -> i16 {
+        0
+    }
     // every other turn, 0 starts at white.
     pub fn turn(&self) -> Color {
         if self.ply % 2 == 0 {
-            Color::White
-        } else {
             Color::Black
+        } else {
+            Color::White
         }
     }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
-    pub fn make_move(&mut self, mut mv: Move) -> Option<Type> {
-        let mut a_pc = match self.get(mv.a) {
-            Some(Sq(Some(p))) => *p,
-            _ => panic!("bad spot a"),
-        };
+    pub fn make_move(&mut self, mv: Move) -> Option<Type> {
+        // extra metadata is per-ply, should match
+        debug_assert!(self.ply as usize == self.extra.len());
+        // copy extra data and push
+        self.ply += 1;
+        self.extra.push(*self.extra.last().unwrap());
+
+        let mut a_pc = self.idx(mv.a).0.unwrap();
+        let b_sq = self.idx(mv.b);
 
         // ensure we are allowed to move the piece
         debug_assert!(a_pc.clr == self.turn());
-
-        let b_sq = self.get_mut(mv.b).unwrap();
 
         // ensure we are not bumping into our own piece
         debug_assert!(match b_sq {
             Sq(Some(pc)) => pc.clr != a_pc.clr,
             Sq(None) => true,
         });
-        // store capture
-        let ret = match b_sq {
+
+        // return capture
+        let mut cap = match b_sq {
             Sq(Some(pc)) => Some(pc.typ),
             Sq(None) => None,
         };
 
+        // prep for en passant
+        let extra = self.extra.last_mut().unwrap();
+        if a_pc.typ == Type::Pawn && (mv.b.y - mv.a.y).abs() == 2 {
+            extra.enp = mv.a.x;
+        } else {
+            extra.enp = -1;
+        }
+
         match mv.extra {
             Some(MvExtra::EnPassant) => {
-                debug_assert!(a_pc.typ == Type::Pawn && ret == None);
+                debug_assert!(a_pc.typ == Type::Pawn && cap == None);
+                cap = Some(Type::Pawn);
+                self.set(en_passant_cap(mv), Sq(None));
             }
             Some(MvExtra::Promote(typ)) => a_pc.typ = typ,
             Some(MvExtra::Castle(side)) => (),
             None => (),
         }
+        self.set(mv.a, Sq(None));
+        self.set(mv.b, Sq(Some(a_pc)));
 
-        *b_sq = Sq(Some(a_pc));
-        *self.get_mut(mv.a).unwrap() = Sq(None);
-
-        return ret;
+        cap
     }
-    pub fn unmake_move(&mut self) {}
+    pub fn unmake_move(&mut self) {
+        self.ply -= 1;
+        self.extra.pop();
+    }
 }
 
 impl Default for State {
@@ -161,7 +221,7 @@ impl Default for State {
         let empty = [Sq::NIL; W];
 
         return State {
-            ply: 0,
+            ply: 1,
             board: [
                 make_backline(Color::White),
                 make_pawns(Color::White),
@@ -172,8 +232,7 @@ impl Default for State {
                 make_pawns(Color::Black),
                 make_backline(Color::Black),
             ],
-            castle: [[true; 2]; 2],
-            enpassant: -1,
+            extra: vec![Default::default()],
         };
     }
 }
