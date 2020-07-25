@@ -56,64 +56,48 @@ const KING_OPTS: &[Pos] = &[
 ];
 pub struct MvMeta {
     mv: Move,
-    p: Piece,
-    cap: Option<Type>,
     score: i16,
 }
 
 impl State {
     fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
         self.make_move(mv);
-
+        moves.push(MvMeta { mv, score: 0 });
         self.unmake_move();
     }
     // pushes the move if there is space, returns whether ray should cont.
-    fn try_move(&mut self, moves: &mut Vec<MvMeta>, orig: Pos, pos: Pos) -> bool {
-        let mv = Move {
-            a: orig,
-            b: pos,
-            extra: None,
-        };
-        let Piece { clr, typ: _ } = match self.get(pos) {
-            Some(Sq(Some(pc))) => *pc,
-            Some(Sq(None)) => {
-                self.add_sudo(moves, mv);
-                return true;
-            }
-            None => return false,
-        };
-        if clr != self.turn() {
-            self.add_sudo(moves, mv);
-        }
-        return false;
-    }
-
-    // take or move-only moves for pawns. returns whether it could move
-    fn special_move(
+    // except if gate(Sq) is false, it just stops early.
+    fn try_move(
         &mut self,
+        gate: impl Fn(bool) -> bool,
         moves: &mut Vec<MvMeta>,
         orig: Pos,
         pos: Pos,
-        is_take: bool,
     ) -> bool {
-        let mv = Move {
+        let mut mv = Move {
             a: orig,
             b: pos,
+            capture: None,
             extra: None,
         };
-        let Piece { clr, typ: _ } = match self.get(pos) {
-            Some(Sq(Some(pc))) => *pc,
-            Some(Sq(None)) => {
-                if !is_take {
-                    self.add_sudo(moves, mv);
-                }
-                return !is_take;
-            }
+        let pos_sq = match self.get(pos) {
+            Some(sq) => *sq,
             None => return false,
         };
-        if clr != self.turn() && is_take {
+        if !gate(pos_sq.0.is_some()) {
+            return false;
+        }
+
+        let Piece { clr, typ } = match pos_sq {
+            Sq(Some(pc)) => pc,
+            Sq(None) => {
+                self.add_sudo(moves, mv);
+                return true;
+            }
+        };
+        if clr != self.turn() {
+            mv.capture = Some(typ);
             self.add_sudo(moves, mv);
-            return true;
         }
         return false;
     }
@@ -125,7 +109,12 @@ impl State {
         let mut add_moves = |orig| {
             macro_rules! special_move {
                 ($dir:expr, $is_take:expr) => {
-                    self.special_move(&mut moves, orig, orig + $dir, $is_take);
+                    self.try_move(|take| take == $is_take, &mut moves, orig, orig + $dir)
+                };
+            }
+            macro_rules! try_move {
+                () => {
+                    |pos| self.try_move(|_| true, &mut moves, orig, pos)
                 };
             }
             let Piece { clr, typ } = match self.get(orig).unwrap() {
@@ -135,7 +124,6 @@ impl State {
             if clr != self.turn() {
                 return;
             }
-            let try_m = |pos| false; //self.try_move(&mut moves, orig, pos);
 
             match typ {
                 Type::Pawn => {
@@ -157,15 +145,15 @@ impl State {
                     special_move!(dir + card::W, true);
                     special_move!(dir + card::E, true);
                 }
-                Type::Knight => leaper(orig, KNIGHT_OPTS, try_m),
-                Type::Bishop => rider(orig, BISHOP_OPTS, try_m),
-                Type::Rook => rider(orig, ROOK_OPTS, try_m),
+                Type::Knight => leaper(orig, KNIGHT_OPTS, try_move!()),
+                Type::Bishop => rider(orig, BISHOP_OPTS, try_move!()),
+                Type::Rook => rider(orig, ROOK_OPTS, try_move!()),
                 Type::Queen => {
-                    rider(orig, BISHOP_OPTS, try_m);
-                    //rider(orig, ROOK_OPTS, try_m);
+                    rider(orig, BISHOP_OPTS, try_move!());
+                    rider(orig, ROOK_OPTS, try_move!());
                 }
                 Type::King => {
-                    leaper(orig, KING_OPTS, try_m);
+                    leaper(orig, KING_OPTS, try_move!());
                 }
             }
         };

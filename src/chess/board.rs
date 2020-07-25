@@ -79,6 +79,7 @@ pub struct State {
     ply: u32,
     board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
     extra: Vec<StateExtra>,
+    moves: Vec<Move>,
 }
 
 impl fmt::Display for State {
@@ -138,12 +139,14 @@ impl State {
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
     pub fn make_move(&mut self, mv: Move) -> Option<Type> {
-        // extra metadata is per-ply, should match
+        // extra moves/metadata is per-ply, should match
         debug_assert!(self.ply as usize == self.extra.len());
+        debug_assert!(self.ply as usize == self.moves.len() + 1);
         // copy extra data and push
-        self.ply += 1;
         self.extra.push(*self.extra.last().unwrap());
+        self.moves.push(mv);
 
+        // moving from a to b
         let mut a_pc = self.idx(mv.a).0.unwrap();
         let b_sq = self.idx(mv.b);
 
@@ -162,14 +165,6 @@ impl State {
             Sq(None) => None,
         };
 
-        // prep for en passant
-        let extra = self.extra.last_mut().unwrap();
-        if a_pc.typ == Type::Pawn && (mv.b.y - mv.a.y).abs() == 2 {
-            extra.enp = mv.a.x;
-        } else {
-            extra.enp = -1;
-        }
-
         match mv.extra {
             Some(MvExtra::EnPassant) => {
                 debug_assert!(a_pc.typ == Type::Pawn && cap == None);
@@ -177,17 +172,68 @@ impl State {
                 self.set(en_passant_cap(mv), Sq(None));
             }
             Some(MvExtra::Promote(typ)) => a_pc.typ = typ,
-            Some(MvExtra::Castle(side)) => (),
+            Some(MvExtra::Castle(_side)) => (),
             None => (),
         }
+
+        // prep for en passant next move
+        let st_extra = self.extra.last_mut().unwrap();
+        if a_pc.typ == Type::Pawn && (mv.b.y - mv.a.y).abs() == 2 {
+            st_extra.enp = mv.a.x;
+        } else {
+            st_extra.enp = -1;
+        }
+
+        // move the pieces
         self.set(mv.a, Sq(None));
         self.set(mv.b, Sq(Some(a_pc)));
+
+        // don't change self.turn() till the end
+        self.ply += 1;
 
         cap
     }
     pub fn unmake_move(&mut self) {
         self.ply -= 1;
-        self.extra.pop();
+        let mut st_extra = self.extra.pop().unwrap();
+
+        let mut mv = self.moves.pop().unwrap();
+
+        // moving from b to a
+        let mut b_pc = self.idx(mv.b).0.unwrap();
+
+        // we came from a, it should be empty
+        debug_assert!(*self.idx(mv.a) == Sq::NIL);
+
+        let enemy_turn = self.turn().other();
+        let enemy_sq = |typ| {
+            Sq(Some(Piece {
+                clr: enemy_turn,
+                typ,
+            }))
+        };
+
+        match mv.extra {
+            Some(MvExtra::EnPassant) => {
+                // don't restore a pawn at the wrong spot
+                mv.capture = None;
+                // restore it at enp spot instead
+                self.set(en_passant_cap(mv), enemy_sq(Type::Pawn));
+            }
+            Some(MvExtra::Promote(_)) => b_pc.typ = Type::Pawn,
+            Some(MvExtra::Castle(_side)) => (),
+            None => (),
+        }
+
+        // move the pieces, restoring a capture
+        self.set(mv.a, Sq(Some(b_pc)));
+        self.set(
+            mv.b,
+            match mv.capture {
+                Some(typ) => enemy_sq(typ),
+                None => Sq(None),
+            },
+        );
     }
 }
 
@@ -233,6 +279,7 @@ impl Default for State {
                 make_backline(Color::Black),
             ],
             extra: vec![Default::default()],
+            moves: vec![],
         };
     }
 }

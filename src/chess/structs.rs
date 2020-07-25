@@ -8,6 +8,14 @@ pub enum Color {
     White = 0,
     Black,
 }
+impl Color {
+    pub fn other(&self) -> Self {
+        match self {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        }
+    }
+}
 #[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
 pub enum Type {
     Pawn = 0,
@@ -54,5 +62,6 @@ pub enum MvExtra {
 pub struct Move {
     pub a: Pos,
     pub b: Pos,
+    pub capture: Option<Type>,
     pub extra: Option<MvExtra>,
 }
