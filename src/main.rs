@@ -1,10 +1,10 @@
 mod chess;
 
 fn main() {
-    let mut board: chess::State = Default::default();
-    let moves = board.get_moves();
+    let mut state: chess::State = Default::default();
+    let moves = state.get_moves();
     assert_eq!(moves.len(), 20);
-    println!("{}", board);
+    println!("{}", state.board_string());
 }
 
 #[cfg(test)]

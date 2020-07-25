@@ -1,22 +1,10 @@
-use std::fmt;
-
 use super::*;
+
+use std::fmt;
+use std::str;
 
 // row major
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
-
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Type::Pawn => write!(f, "P"),
-            Type::Knight => write!(f, "N"),
-            Type::Bishop => write!(f, "B"),
-            Type::Rook => write!(f, "R"),
-            Type::Queen => write!(f, "Q"),
-            Type::King => write!(f, "K"),
-        }
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Sq(pub Option<Piece>);
@@ -27,26 +15,6 @@ impl Sq {
     const NIL: Sq = Sq(None);
 }
 
-impl fmt::Display for Sq {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            Some(p) => {
-                let s = p.typ.to_string();
-                write!(
-                    f,
-                    "{}",
-                    if p.clr == Color::White {
-                        s
-                    } else {
-                        s.to_lowercase()
-                    }
-                )
-            }
-            None => write!(f, "."),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StateExtra {
     castle: [[bool; 2]; 2],
@@ -54,7 +22,6 @@ pub struct StateExtra {
     pub enp: i8,
 }
 
-// am I actually going to bitpack this later? probably not
 impl StateExtra {
     pub fn get_castle(&self, clr: Color, side: CastleSide) -> &bool {
         &self.castle[clr as usize][side as usize]
@@ -64,36 +31,13 @@ impl StateExtra {
     }
 }
 
-impl Default for StateExtra {
-    fn default() -> Self {
-        StateExtra {
-            capture: None,
-            castle: [[true, true], [true, true]],
-            enp: -1,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {
     ply: u32,
     board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
+    king_pos: [Pos; 2],
     extra: Vec<StateExtra>,
     moves: Vec<Move>,
-}
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
-        where
-            I: IntoIterator<Item = J>,
-        {
-            row.into_iter().map(show).collect::<Vec<_>>().join(delim)
-        };
-        let show_row = |row| show_iter(|e| format!("{}", e), " ", row);
-        let s = show_iter(show_row, "\n", self.board.iter().rev());
-        write!(f, "{}", s)
-    }
 }
 
 // gets the position of the taken pawn from en passant
@@ -124,9 +68,7 @@ impl State {
         let sq = self.get_mut(i).unwrap();
         *sq = x;
     }
-    pub fn score(&self) -> i16 {
-        0
-    }
+
     // every other turn, 0 starts at white.
     pub fn turn(&self) -> Color {
         if self.ply % 2 == 0 {
@@ -235,51 +177,173 @@ impl State {
             },
         );
     }
+    pub fn zero_board() -> Self {
+        State {
+            ply: 1,
+            board: [[Sq::NIL; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
+            king_pos: [Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }],
+            extra: vec![StateExtra {
+                capture: None,
+                castle: [[false; 2]; 2],
+                enp: -1,
+            }],
+            moves: vec![],
+        }
+    }
+}
+
+// String processing stuff
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                Type::Pawn => "P",
+                Type::Knight => "N",
+                Type::Bishop => "B",
+                Type::Rook => "R",
+                Type::Queen => "Q",
+                Type::King => "K",
+            }
+        )
+    }
+}
+
+impl fmt::Display for Sq {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            Some(p) => {
+                let s = p.typ.to_string();
+                write!(
+                    f,
+                    "{}",
+                    if p.clr == Color::White {
+                        s
+                    } else {
+                        s.to_lowercase()
+                    }
+                )
+            }
+            None => write!(f, "."),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseSqError;
+
+impl fmt::Display for ParseSqError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "parse square error")
+    }
+}
+
+// super lazy way to parse
+impl str::FromStr for Sq {
+    type Err = ParseSqError;
+
+    fn from_str(sq_str: &str) -> Result<Self, Self::Err> {
+        if sq_str == "." {
+            return Ok(Sq(None));
+        }
+        for &clr in &[Color::White, Color::Black] {
+            for &typ in &[
+                Type::Pawn,
+                Type::Knight,
+                Type::Bishop,
+                Type::Rook,
+                Type::Queen,
+                Type::King,
+            ] {
+                let sq = Sq(Some(Piece { clr, typ }));
+                if sq_str == sq.to_string() {
+                    return Ok(sq);
+                }
+            }
+        }
+        Err(ParseSqError)
+    }
+}
+
+fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
+where
+    I: IntoIterator<Item = J>,
+{
+    row.into_iter().map(show).collect::<Vec<_>>().join(delim)
+}
+impl State {
+    pub fn board_string(&self) -> String {
+        let show_row = |row| show_iter(|e| format!("{}", e), " ", row);
+        show_iter(show_row, "\n", self.board.iter().rev())
+    }
+}
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", "fen")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseFenError;
+
+impl fmt::Display for ParseFenError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "parse FEN error")
+    }
+}
+
+impl str::FromStr for State {
+    type Err = ParseFenError;
+
+    fn from_str(fen: &str) -> Result<Self, Self::Err> {
+        let mut state = State::zero_board();
+        let items = fen.split(" ").collect::<Vec<_>>();
+        if let [board, turn, castle, enp, _half, full] = items.as_slice() {
+            let clr_add = match *turn {
+                "w" => 0,
+                "b" => 1,
+                _ => return Err(ParseFenError),
+            };
+            // full turns are double, we start at ply 1, not full turn 1
+            state.ply = match str::parse::<u32>(full).ok() {
+                Some(x) => Ok(2 * x - 1 + clr_add),
+                None => Err(ParseFenError),
+            }?;
+
+            for (inv_y, row) in board.split("/").enumerate() {
+                if inv_y >= BOARD_DIM.y as usize {
+                    return Err(ParseFenError);
+                }
+                let mut x: usize = 0;
+                for c in row.chars() {
+                    if "12345678".contains(c) {
+                        x += c as usize - '0' as usize;
+                    } else {
+                        if x >= BOARD_DIM.x as usize {
+                            return Err(ParseFenError);
+                        }
+                        let y = BOARD_DIM.y - 1 - inv_y as i8;
+                        let sq = match str::parse::<Sq>(&c.to_string()).ok() {
+                            Some(x) => Ok(x),
+                            None => Err(ParseFenError),
+                        }?;
+                        state.set(Pos { x: x as i8, y }, sq);
+                        x += 1;
+                    }
+                }
+            }
+
+            Ok(state)
+        } else {
+            Err(ParseFenError)
+        }
+    }
 }
 
 impl Default for State {
     fn default() -> Self {
-        const W: usize = BOARD_DIM.x as usize;
-
-        let make_set = |c, ts: [Type; W]| {
-            let mut squares = [Sq::NIL; W];
-            for (i, t) in ts.iter().enumerate() {
-                squares[i] = Sq::new(c, *t);
-            }
-            squares
-        };
-        let make_backline = |c| {
-            make_set(
-                c,
-                [
-                    Type::Rook,
-                    Type::Knight,
-                    Type::Bishop,
-                    Type::Queen,
-                    Type::King,
-                    Type::Bishop,
-                    Type::Knight,
-                    Type::Rook,
-                ],
-            )
-        };
-        let make_pawns = |c| [Sq::new(c, Type::Pawn); W];
-        let empty = [Sq::NIL; W];
-
-        return State {
-            ply: 1,
-            board: [
-                make_backline(Color::White),
-                make_pawns(Color::White),
-                empty,
-                empty,
-                empty,
-                empty,
-                make_pawns(Color::Black),
-                make_backline(Color::Black),
-            ],
-            extra: vec![Default::default()],
-            moves: vec![],
-        };
+        str::parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 }
