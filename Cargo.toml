@@ -14,3 +14,6 @@ features = ["add", "add_assign", "into", "from", "not"]
 [dependencies]
 num-traits = "0.2"
 num-derive = "0.3"
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"

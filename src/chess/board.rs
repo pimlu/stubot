@@ -7,15 +7,6 @@ use std::str;
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Sq(pub Option<Piece>);
-impl Sq {
-    fn new(clr: Color, typ: Type) -> Sq {
-        return Sq(Some(Piece { clr, typ }));
-    }
-    const NIL: Sq = Sq(None);
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StateExtra {
     castle: [[bool; 2]; 2],
     pub capture: Option<Type>,
@@ -36,7 +27,8 @@ pub struct State {
     ply: u32,
     board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
     king_pos: [Pos; 2],
-    extra: Vec<StateExtra>,
+    cur_extra: StateExtra,
+    extras: Vec<StateExtra>,
     moves: Vec<Move>,
 }
 
@@ -77,15 +69,18 @@ impl State {
             Color::White
         }
     }
+    fn commit_extra(&mut self, extra: StateExtra) {
+        self.cur_extra = extra;
+    }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
     pub fn make_move(&mut self, mv: Move) -> Option<Type> {
         // extra moves/metadata is per-ply, should match
-        debug_assert!(self.ply as usize == self.extra.len());
-        debug_assert!(self.ply as usize == self.moves.len() + 1);
+        debug_assert!(self.ply as usize == self.extras.len());
+        debug_assert!(self.ply as usize == self.moves.len());
         // copy extra data and push
-        self.extra.push(*self.extra.last().unwrap());
+        self.extras.push(self.cur_extra);
         self.moves.push(mv);
 
         // moving from a to b
@@ -119,12 +114,13 @@ impl State {
         }
 
         // prep for en passant next move
-        let st_extra = self.extra.last_mut().unwrap();
+        let mut st_extra = self.cur_extra;
         if a_pc.typ == Type::Pawn && (mv.b.y - mv.a.y).abs() == 2 {
             st_extra.enp = mv.a.x;
         } else {
             st_extra.enp = -1;
         }
+        self.commit_extra(st_extra);
 
         // move the pieces
         self.set(mv.a, Sq(None));
@@ -137,7 +133,7 @@ impl State {
     }
     pub fn unmake_move(&mut self) {
         self.ply -= 1;
-        let mut st_extra = self.extra.pop().unwrap();
+        let mut st_extra = self.extras.pop().unwrap();
 
         let mut mv = self.moves.pop().unwrap();
 
@@ -145,7 +141,7 @@ impl State {
         let mut b_pc = self.idx(mv.b).0.unwrap();
 
         // we came from a, it should be empty
-        debug_assert!(*self.idx(mv.a) == Sq::NIL);
+        debug_assert!(*self.idx(mv.a) == Sq(None));
 
         let enemy_turn = self.turn().other();
         let enemy_sq = |typ| {
@@ -167,6 +163,8 @@ impl State {
             None => (),
         }
 
+        self.commit_extra(st_extra);
+
         // move the pieces, restoring a capture
         self.set(mv.a, Sq(Some(b_pc)));
         self.set(
@@ -179,14 +177,15 @@ impl State {
     }
     pub fn zero_board() -> Self {
         State {
-            ply: 1,
-            board: [[Sq::NIL; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
+            ply: 0,
+            board: [[Sq(None); BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
             king_pos: [Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }],
-            extra: vec![StateExtra {
+            cur_extra: StateExtra {
                 capture: None,
                 castle: [[false; 2]; 2],
                 enp: -1,
-            }],
+            },
+            extras: vec![],
             moves: vec![],
         }
     }
@@ -194,79 +193,7 @@ impl State {
 
 // String processing stuff
 
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match *self {
-                Type::Pawn => "P",
-                Type::Knight => "N",
-                Type::Bishop => "B",
-                Type::Rook => "R",
-                Type::Queen => "Q",
-                Type::King => "K",
-            }
-        )
-    }
-}
-
-impl fmt::Display for Sq {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.0 {
-            Some(p) => {
-                let s = p.typ.to_string();
-                write!(
-                    f,
-                    "{}",
-                    if p.clr == Color::White {
-                        s
-                    } else {
-                        s.to_lowercase()
-                    }
-                )
-            }
-            None => write!(f, "."),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ParseSqError;
-
-impl fmt::Display for ParseSqError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "parse square error")
-    }
-}
-
-// super lazy way to parse
-impl str::FromStr for Sq {
-    type Err = ParseSqError;
-
-    fn from_str(sq_str: &str) -> Result<Self, Self::Err> {
-        if sq_str == "." {
-            return Ok(Sq(None));
-        }
-        for &clr in &[Color::White, Color::Black] {
-            for &typ in &[
-                Type::Pawn,
-                Type::Knight,
-                Type::Bishop,
-                Type::Rook,
-                Type::Queen,
-                Type::King,
-            ] {
-                let sq = Sq(Some(Piece { clr, typ }));
-                if sq_str == sq.to_string() {
-                    return Ok(sq);
-                }
-            }
-        }
-        Err(ParseSqError)
-    }
-}
-
+// maps an iterator and joins it on delim
 fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
 where
     I: IntoIterator<Item = J>,
@@ -285,17 +212,8 @@ impl fmt::Display for State {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ParseFenError;
-
-impl fmt::Display for ParseFenError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "parse FEN error")
-    }
-}
-
 impl str::FromStr for State {
-    type Err = ParseFenError;
+    type Err = ParseError;
 
     fn from_str(fen: &str) -> Result<Self, Self::Err> {
         let mut state = State::zero_board();
@@ -304,30 +222,31 @@ impl str::FromStr for State {
             let clr_add = match *turn {
                 "w" => 0,
                 "b" => 1,
-                _ => return Err(ParseFenError),
+                _ => return Err(ParseError::new("FEN")),
             };
-            // full turns are double, we start at ply 1, not full turn 1
+            // full turns are double, we start at ply 0, not full turn 1
             state.ply = match str::parse::<u32>(full).ok() {
-                Some(x) => Ok(2 * x - 1 + clr_add),
-                None => Err(ParseFenError),
+                Some(x) => Ok(2 * (x - 1) + clr_add),
+                None => Err(ParseError::new("FEN")),
             }?;
 
             for (inv_y, row) in board.split("/").enumerate() {
                 if inv_y >= BOARD_DIM.y as usize {
-                    return Err(ParseFenError);
+                    return Err(ParseError::new("FEN"));
                 }
                 let mut x: usize = 0;
                 for c in row.chars() {
+                    //TODO larger boards?
                     if "12345678".contains(c) {
                         x += c as usize - '0' as usize;
                     } else {
                         if x >= BOARD_DIM.x as usize {
-                            return Err(ParseFenError);
+                            return Err(ParseError::new("FEN"));
                         }
                         let y = BOARD_DIM.y - 1 - inv_y as i8;
                         let sq = match str::parse::<Sq>(&c.to_string()).ok() {
                             Some(x) => Ok(x),
-                            None => Err(ParseFenError),
+                            None => Err(ParseError::new("FEN")),
                         }?;
                         state.set(Pos { x: x as i8, y }, sq);
                         x += 1;
@@ -337,7 +256,7 @@ impl str::FromStr for State {
 
             Ok(state)
         } else {
-            Err(ParseFenError)
+            Err(ParseError::new("FEN"))
         }
     }
 }

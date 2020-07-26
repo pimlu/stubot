@@ -55,8 +55,8 @@ const KING_OPTS: &[Pos] = &[
     Pos { x: 0, y: -1 },
 ];
 pub struct MvMeta {
-    mv: Move,
-    score: i16,
+    pub mv: Move,
+    pub score: i16,
 }
 
 impl State {
