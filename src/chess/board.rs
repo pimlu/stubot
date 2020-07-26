@@ -3,9 +3,6 @@ use super::*;
 use std::fmt;
 use std::str;
 
-// row major
-pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StateExtra {
     castle: [[bool; 2]; 2],
@@ -14,6 +11,13 @@ pub struct StateExtra {
 }
 
 impl StateExtra {
+    fn zero_init() -> Self {
+        StateExtra {
+            castle: [[false; 2]; 2],
+            capture: None,
+            enp: -1,
+        }
+    }
     pub fn get_castle(&self, clr: Color, side: CastleSide) -> &bool {
         &self.castle[clr as usize][side as usize]
     }
@@ -53,12 +57,19 @@ impl State {
             .get_mut(i.y as usize)
             .and_then(|r| r.get_mut(i.x as usize))
     }
-    pub fn idx(&self, i: Pos) -> &Sq {
-        self.get(i).unwrap()
+    pub fn idx(&self, pos: Pos) -> &Sq {
+        self.get(pos).unwrap()
     }
-    fn set(&mut self, i: Pos, x: Sq) {
-        let sq = self.get_mut(i).unwrap();
+    fn set(&mut self, pos: Pos, x: Sq) {
+        let sq = self.get_mut(pos).unwrap();
         *sq = x;
+        let Piece { clr, typ } = match x {
+            Sq(Some(pc)) => pc,
+            Sq(None) => return,
+        };
+        if typ == Type::King {
+            self.set_king_pos(clr, pos);
+        }
     }
 
     // every other turn, 0 starts at white.
@@ -77,6 +88,9 @@ impl State {
     }
     pub fn get_king_pos(&self, clr: Color) -> &Pos {
         &self.king_pos[clr as usize]
+    }
+    pub fn set_king_pos(&mut self, clr: Color, pos: Pos) {
+        self.king_pos[clr as usize] = pos;
     }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
@@ -181,11 +195,7 @@ impl State {
             ply: 0,
             board: [[Sq(None); BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
             king_pos: [Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }],
-            cur_extra: StateExtra {
-                capture: None,
-                castle: [[false; 2]; 2],
-                enp: -1,
-            },
+            cur_extra: StateExtra::zero_init(),
             extras: vec![],
             moves: vec![],
         }
@@ -217,6 +227,15 @@ impl str::FromStr for State {
     type Err = ParseError;
 
     fn from_str(fen: &str) -> Result<Self, Self::Err> {
+        // seems like errors are a pain in rust, make the pain go away :)
+        fn conv_err<T, E>(res: Result<T, E>) -> Result<T, ParseError> {
+            match res.ok() {
+                Some(x) => Ok(x),
+                None => Err(ParseError::new("FEN")),
+            }
+        }
+        let p_sq = |c: char| conv_err(str::parse::<Sq>(&c.to_string()));
+
         let mut state = State::zero_board();
         let items = fen.split(" ").collect::<Vec<_>>();
         if let [board, turn, castle, enp, _half, full] = items.as_slice() {
@@ -225,11 +244,23 @@ impl str::FromStr for State {
                 "b" => 1,
                 _ => return Err(ParseError::new("FEN")),
             };
+            let full_u = conv_err(str::parse::<u32>(full))?;
             // full turns are double, we start at ply 0, not full turn 1
-            state.ply = match str::parse::<u32>(full).ok() {
-                Some(x) => Ok(2 * (x - 1) + clr_add),
-                None => Err(ParseError::new("FEN")),
-            }?;
+            state.ply = 2 * (full_u - 1) + clr_add;
+
+            let mut extra = StateExtra::zero_init();
+            for c in castle.chars() {
+                let (clr, side) = match c {
+                    'q' => (Color::Black, CastleSide::Long),
+                    'k' => (Color::Black, CastleSide::Short),
+                    'Q' => (Color::White, CastleSide::Long),
+                    'K' => (Color::White, CastleSide::Short),
+                    '-' => continue,
+                    _ => return Err(ParseError::new("FEN")),
+                };
+                extra.set_castle(clr, side, true);
+            }
+            state.commit_extra(extra);
 
             for (inv_y, row) in board.split("/").enumerate() {
                 if inv_y >= BOARD_DIM.y as usize {
@@ -244,12 +275,14 @@ impl str::FromStr for State {
                         if x >= BOARD_DIM.x as usize {
                             return Err(ParseError::new("FEN"));
                         }
-                        let y = BOARD_DIM.y - 1 - inv_y as i8;
-                        let sq = match str::parse::<Sq>(&c.to_string()).ok() {
-                            Some(x) => Ok(x),
-                            None => Err(ParseError::new("FEN")),
-                        }?;
-                        state.set(Pos { x: x as i8, y }, sq);
+                        state.set(
+                            Pos {
+                                x: x as i8,
+                                y: inv_y as i8,
+                            }
+                            .inv_y(),
+                            p_sq(c)?,
+                        );
                         x += 1;
                     }
                 }

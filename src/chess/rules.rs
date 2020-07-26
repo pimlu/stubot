@@ -68,10 +68,13 @@ impl State {
     fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
         let clr = self.turn();
         self.make_move(mv);
-        moves.push(MvMeta { mv, score: 0 });
+        let king_pos = *self.get_king_pos(clr);
         // make sure there is actually a king where we are guarding
         // for check
-        //debug_assert!(*self.idx(*self.get_king_pos(clr)) == Sq::new(clr, Type::King));
+        debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
+        if !self.is_attacked(king_pos, clr.other()) {
+            moves.push(MvMeta { mv, score: 0 });
+        }
         self.unmake_move();
     }
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
@@ -89,7 +92,7 @@ impl State {
             }
         }
         let mut found_check = false;
-        let mut check = |threat| {
+        let check = |threat| {
             move |pos| {
                 let Piece { clr, typ } = match self.get(pos) {
                     Some(Sq(Some(pc))) => *pc,

@@ -6,6 +6,15 @@ use num_derive::FromPrimitive;
 use std::fmt;
 use std::str;
 
+// row major
+pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
+pub fn castle_rook_col(side: CastleSide) -> i8 {
+    match side {
+        CastleSide::Long => 3,
+        CastleSide::Short => 5,
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
 pub enum Color {
     White = 0,
@@ -44,6 +53,15 @@ pub struct Piece {
 pub struct Pos {
     pub y: i8,
     pub x: i8,
+}
+
+impl Pos {
+    pub fn inv_y(&self) -> Pos {
+        Pos {
+            x: self.x,
+            y: BOARD_DIM.y - 1 - self.y,
+        }
+    }
 }
 
 pub mod card {
@@ -103,12 +121,12 @@ impl fmt::Display for Type {
             f,
             "{}",
             match *self {
-                Type::Pawn => "P",
-                Type::Knight => "N",
-                Type::Bishop => "B",
-                Type::Rook => "R",
-                Type::Queen => "Q",
-                Type::King => "K",
+                Type::Pawn => "p",
+                Type::Knight => "n",
+                Type::Bishop => "b",
+                Type::Rook => "r",
+                Type::Queen => "q",
+                Type::King => "k",
             }
         )
     }
@@ -123,9 +141,9 @@ impl fmt::Display for Sq {
                     f,
                     "{}",
                     if p.clr == Color::White {
-                        s
+                        s.to_uppercase()
                     } else {
-                        s.to_lowercase()
+                        s
                     }
                 )
             }
@@ -158,5 +176,61 @@ impl str::FromStr for Sq {
             }
         }
         Err(ParseError::new("Sq"))
+    }
+}
+
+impl fmt::Display for Pos {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let char_add = |c, p| (c as u8 + p as u8) as char;
+        write!(
+            f,
+            "{}{}",
+            char_add('a', self.x),
+            char_add('1', self.inv_y().y)
+        )
+    }
+}
+
+impl str::FromStr for Pos {
+    type Err = ParseError;
+
+    fn from_str(pos: &str) -> Result<Self, Self::Err> {
+        if pos.len() < 2 {
+            return Err(ParseError::new("Pos"));
+        }
+
+        let x = pos.chars().nth(0).unwrap() as i8 - 'a' as i8;
+        let y: i8 = match str::parse(&pos[1..]).ok() {
+            Some(v) => Ok(v),
+            None => Err(ParseError::new("Pos")),
+        }?;
+        Ok(Pos { x, y: y - 1 }.inv_y())
+    }
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let promote = match self.extra {
+            Some(MvExtra::Promote(typ)) => typ.to_string(),
+            _ => "".to_string(),
+        };
+        write!(f, "{}{}{}", self.a, self.b, promote)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn pos_serial() {
+        let test_pos = |p: &str| {
+            let s = p.to_string();
+            assert_eq!(s, str::parse::<Pos>(&s).unwrap().to_string());
+        };
+        test_pos("a3");
+        test_pos("c8");
+        test_pos("g1");
+        //assert_eq!("a1", Pos { x: 0, y: 0}.to_string());
     }
 }
