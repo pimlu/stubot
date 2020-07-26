@@ -55,15 +55,6 @@ pub struct Pos {
     pub x: i8,
 }
 
-impl Pos {
-    pub fn inv_y(&self) -> Pos {
-        Pos {
-            x: self.x,
-            y: BOARD_DIM.y - 1 - self.y,
-        }
-    }
-}
-
 pub mod card {
     use super::Pos;
     pub const N: Pos = Pos { x: 0, y: 1 };
@@ -182,12 +173,7 @@ impl str::FromStr for Sq {
 impl fmt::Display for Pos {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let char_add = |c, p| (c as u8 + p as u8) as char;
-        write!(
-            f,
-            "{}{}",
-            char_add('a', self.x),
-            char_add('1', self.inv_y().y)
-        )
+        write!(f, "{}{}", char_add('a', self.x), char_add('1', self.y))
     }
 }
 
@@ -204,7 +190,7 @@ impl str::FromStr for Pos {
             Some(v) => Ok(v),
             None => Err(ParseError::new("Pos")),
         }?;
-        Ok(Pos { x, y: y - 1 }.inv_y())
+        Ok(Pos { x, y: y - 1 })
     }
 }
 

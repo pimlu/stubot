@@ -75,9 +75,9 @@ impl State {
     // every other turn, 0 starts at white.
     pub fn turn(&self) -> Color {
         if self.ply % 2 == 0 {
-            Color::Black
-        } else {
             Color::White
+        } else {
+            Color::Black
         }
     }
     fn commit_extra(&mut self, extra: StateExtra) {
@@ -262,8 +262,8 @@ impl str::FromStr for State {
             }
             state.commit_extra(extra);
 
-            for (inv_y, row) in board.split("/").enumerate() {
-                if inv_y >= BOARD_DIM.y as usize {
+            for (y, row) in board.rsplit("/").enumerate() {
+                if y >= BOARD_DIM.y as usize {
                     return Err(ParseError::new("FEN"));
                 }
                 let mut x: usize = 0;
@@ -278,9 +278,8 @@ impl str::FromStr for State {
                         state.set(
                             Pos {
                                 x: x as i8,
-                                y: inv_y as i8,
-                            }
-                            .inv_y(),
+                                y: y as i8,
+                            },
                             p_sq(c)?,
                         );
                         x += 1;
@@ -298,5 +297,26 @@ impl str::FromStr for State {
 impl Default for State {
     fn default() -> Self {
         str::parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+    #[test]
+    fn correct_init() {
+        assert_eq!(
+            State::default().board_string(),
+            "r n b q k b n r
+p p p p p p p p
+. . . . . . . .
+. . . . . . . .
+. . . . . . . .
+. . . . . . . .
+P P P P P P P P
+R N B Q K B N R"
+        );
     }
 }
