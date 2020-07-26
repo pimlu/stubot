@@ -72,6 +72,12 @@ impl State {
     fn commit_extra(&mut self, extra: StateExtra) {
         self.cur_extra = extra;
     }
+    pub fn get_extra(&self) -> &StateExtra {
+        &self.cur_extra
+    }
+    pub fn get_king_pos(&self, clr: Color) -> &Pos {
+        &self.king_pos[clr as usize]
+    }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
@@ -144,12 +150,7 @@ impl State {
         debug_assert!(*self.idx(mv.a) == Sq(None));
 
         let enemy_turn = self.turn().other();
-        let enemy_sq = |typ| {
-            Sq(Some(Piece {
-                clr: enemy_turn,
-                typ,
-            }))
-        };
+        let enemy_sq = |typ| Sq::new(enemy_turn, typ);
 
         match mv.extra {
             Some(MvExtra::EnPassant) => {

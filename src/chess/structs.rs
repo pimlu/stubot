@@ -1,6 +1,6 @@
 extern crate derive_more;
 
-use derive_more::{Add, AddAssign, From, Into, Neg, Sub, SubAssign};
+use derive_more::{Add, AddAssign, From, Into, Mul, Neg, Sub, SubAssign};
 use num_derive::FromPrimitive;
 
 use std::fmt;
@@ -40,7 +40,7 @@ pub struct Piece {
     pub typ: Type,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Add, AddAssign, Sub, SubAssign, Neg, From, Into)]
+#[derive(Debug, Copy, Clone, PartialEq, Add, AddAssign, Sub, SubAssign, Neg, Mul, From, Into)]
 pub struct Pos {
     pub y: i8,
     pub x: i8,
@@ -71,6 +71,12 @@ pub struct Move {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Sq(pub Option<Piece>);
+
+impl Sq {
+    pub fn new(clr: Color, typ: Type) -> Self {
+        Sq(Some(Piece { clr, typ }))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ParseError {
