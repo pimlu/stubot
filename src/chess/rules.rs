@@ -59,6 +59,8 @@ const KING_OPTS: &[Pos] = &[
     Pos { x: 0, y: 1 },
     Pos { x: 0, y: -1 },
 ];
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MvMeta {
     pub mv: Move,
     pub score: i16,
@@ -78,6 +80,8 @@ impl State {
         self.unmake_move();
     }
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
+        use std::cell::Cell;
+
         let enemy_knight = Sq::new(enemy, Type::Knight);
         for &opt in KNIGHT_OPTS {
             if self.get(orig + opt) == Some(&enemy_knight) {
@@ -91,36 +95,38 @@ impl State {
                 return true;
             }
         }
-        let mut found_check = false;
+        let found_attack = &Cell::new(false);
+        let attack = || {
+            found_attack.set(true);
+        };
         let check = |threat| {
             move |pos| {
                 let Piece { clr, typ } = match self.get(pos) {
                     Some(Sq(Some(pc))) => *pc,
                     // keep scanning if we haven't found a check
-                    Some(Sq(None)) => return !found_check,
+                    Some(Sq(None)) => return !found_attack.get(),
                     None => return false,
                 };
 
                 if clr == enemy {
                     if typ == threat || typ == Type::Queen {
-                        found_check = true;
-                    }
-                    if typ == Type::King {
+                        attack();
+                    } else if typ == Type::King {
                         let diff = pos - orig;
                         // king should be right next to them
                         if cmp::max(diff.x.abs(), diff.y.abs()) <= 1 {
-                            found_check = true;
+                            attack();
                         }
                     }
                 }
-
-                !found_check
+                // scan threats bump into pieces
+                false
             }
         };
         rider(orig, BISHOP_OPTS, check(Type::Bishop));
         rider(orig, ROOK_OPTS, check(Type::Rook));
 
-        found_check
+        found_attack.get()
     }
     // pushes the move if there is space, returns whether ray should continue.
     // return value is unused in some cases.
@@ -241,5 +247,45 @@ impl State {
             }
         }
         moves
+    }
+    // find move with matching to_str
+    pub fn find_move(&mut self, mv_str: &str) -> Option<MvMeta> {
+        let moves = self.get_moves();
+        let names: Vec<_> = moves.iter().map(|meta| meta.mv.to_string()).collect();
+        moves
+            .iter()
+            .find(|meta| meta.mv.to_string() == mv_str)
+            .copied()
+    }
+    // make matching moves in sequence
+    pub fn run_moves<'a>(&mut self, moves_str: impl Iterator<Item = &'a str>) {
+        for mv_str in moves_str {
+            match self.find_move(mv_str) {
+                Some(meta) => self.make_move(meta.mv),
+                None => panic!("no matching move {}", mv_str),
+            };
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    fn test_move(moves_str: &str) -> Option<Move> {
+        let mut state = State::default();
+        let mut moves: Vec<&str> = moves_str.split(" ").collect();
+        let last = moves.pop().unwrap();
+
+        state.run_moves(moves.iter().map(|&s| s));
+
+        state.find_move(last).map(|meta| meta.mv)
+    }
+    #[test]
+    fn king_into_check() {
+        assert!(test_move("b2b3 e7e5 c1a3 e8e7").is_none());
+    }
+    #[test]
+    fn wacky_bongcloud() {
+        assert!(test_move("d2d3 a7a5 e1d2").is_some());
     }
 }

@@ -96,9 +96,8 @@ impl State {
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
     pub fn make_move(&mut self, mv: Move) -> Option<Type> {
-        // extra moves/metadata is per-ply, should match
-        debug_assert!(self.ply as usize == self.extras.len());
-        debug_assert!(self.ply as usize == self.moves.len());
+        // extra moves/metadata is per make_move, should match
+        debug_assert!(self.extras.len() == self.moves.len());
         // copy extra data and push
         self.extras.push(self.cur_extra);
         self.moves.push(mv);
@@ -303,8 +302,8 @@ impl Default for State {
 #[cfg(test)]
 mod test {
     use super::*;
-
     use pretty_assertions::assert_eq;
+
     #[test]
     fn correct_init() {
         assert_eq!(

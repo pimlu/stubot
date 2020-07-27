@@ -16,6 +16,39 @@ pub fn perft(state: &mut chess::State, depth: u32) -> u64 {
         .sum()
 }
 
+pub fn perftree(state: &mut chess::State, depth: u32) -> String {
+    let mut sum: u64 = 0;
+    let mut moves: Vec<_> = state
+        .get_moves()
+        .iter()
+        .map(|meta| {
+            let mv = meta.mv;
+
+            let cpy = state.clone();
+            state.make_move(mv);
+            let nodes = cmds::perft(state, depth - 1);
+            state.unmake_move();
+            // kinda expensive unmake comparison test
+            debug_assert!(*state == cpy);
+
+            sum += nodes;
+            (mv.to_string(), nodes)
+        })
+        .collect();
+
+    moves.sort_by_key(|tup| tup.0.to_string());
+
+    format!(
+        "{}\n\n{}",
+        moves
+            .iter()
+            .map(|(mv, n)| format!("{} {}", mv, n))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        sum
+    )
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -26,6 +59,13 @@ mod test {
     fn test_initial() {
         let mut state: chess::State = Default::default();
         test_position(&mut state, vec![20, 400, 8902]);
+    }
+
+    #[test]
+    fn test_kiwipete() {
+        let pos = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+        let mut state: chess::State = str::parse(pos).unwrap();
+        test_position(&mut state, vec![48, 2039, 97862]);
     }
 
     fn test_position(state: &mut chess::State, nodes: Vec<u64>) {

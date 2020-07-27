@@ -217,6 +217,6 @@ mod test {
         test_pos("a3");
         test_pos("c8");
         test_pos("g1");
-        //assert_eq!("a1", Pos { x: 0, y: 0}.to_string());
+        assert_eq!("a1", Pos { x: 0, y: 0 }.to_string());
     }
 }
