@@ -1,4 +1,5 @@
 mod board;
+pub mod consts;
 mod rules;
 mod structs;
 

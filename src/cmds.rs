@@ -49,6 +49,7 @@ pub fn perftree(state: &mut chess::State, depth: u32) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::chess::consts;
 
     use pretty_assertions::assert_eq;
 
@@ -60,8 +61,7 @@ mod test {
 
     #[test]
     fn test_kiwipete() {
-        let pos = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-        let mut state: chess::State = str::parse(pos).unwrap();
+        let mut state: chess::State = str::parse(consts::KIWIPETE).unwrap();
         test_position(&mut state, vec![48, 2039, 97862]);
     }
 

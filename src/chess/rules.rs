@@ -66,19 +66,13 @@ pub struct MvMeta {
     pub score: i16,
 }
 
-fn rel_y(clr: Color, y: i8) -> i8 {
-    match clr {
-        Color::White => y,
-        Color::Black => BOARD_DIM.y - 1 - y
-    }
-}
-
 impl State {
-    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mut mv: Move) {
+    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
         let clr = self.turn();
 
         // kinda expensive unmake comparison test
-        let cpy = self.clone();
+        #[cfg(test)]
+        let mut cpy = self.clone();
 
         self.make_move(mv);
         let king_pos = *self.get_king_pos(clr);
@@ -86,12 +80,23 @@ impl State {
         // for check
         debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
         if !self.is_attacked(king_pos, clr.other()) {
-            moves.push(MvMeta { mv,  score: 0 });
+            moves.push(MvMeta { mv, score: 0 });
         }
         self.unmake_move();
 
         // kinda expensive unmake comparison test
-        debug_assert!(*self == cpy);
+        #[cfg(test)]
+        if *self != cpy {
+            println!("orig:");
+            println!("{}", cpy.board_string());
+            println!("then move {}:", mv);
+            println!("{:?}", mv);
+            cpy.make_move(mv);
+            println!("{}", cpy.board_string());
+            println!("unmade into:");
+            println!("{}", self.board_string());
+            assert!(false);
+        }
     }
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
         use std::cell::Cell;
@@ -102,7 +107,8 @@ impl State {
                 return true;
             }
         }
-        let pdir = pawn_dir(enemy);
+        // reverse the pawn attack direction, this is relative to the king
+        let pdir = pawn_dir(enemy.other());
         let enemy_pawn = Sq::new(enemy, Type::Pawn);
         for &side in &[card::E, card::W] {
             if self.get(orig + pdir + side) == Some(&enemy_pawn) {
@@ -150,7 +156,7 @@ impl State {
         &mut self,
         gate: impl Fn(bool) -> bool,
         moves: &mut Vec<MvMeta>,
-        mut mv: Move
+        mut mv: Move,
     ) -> bool {
         if mv.extra == Some(MvExtra::EnPassant) {
             mv.capture = Some(Type::Pawn);
@@ -185,12 +191,18 @@ impl State {
         let mut add_moves = |orig| {
             macro_rules! try_move {
                 ($gate: expr, $extra: expr) => {
-                    |pos| self.try_move($gate, &mut moves, Move {
-                        a: orig,
-                        b: pos,
-                        capture: None,
-                        extra: $extra
-                    })
+                    |pos| {
+                        self.try_move(
+                            $gate,
+                            &mut moves,
+                            Move {
+                                a: orig,
+                                b: pos,
+                                capture: None,
+                                extra: $extra,
+                            },
+                        )
+                    }
                 };
             }
             macro_rules! pawn_move {
@@ -254,12 +266,13 @@ impl State {
                         add_move!(orig + dir);
                         let rights = *self.get_extra().get_castle(clr, side);
                         // also check that the extra queenside spot is free
-                        let q_blocked =
-                            side == CastleSide::Long && *self.idx(orig + dir * 3) != Sq(None);
-                        if !rights || q_blocked {
+                        if !rights
+                            || side == CastleSide::Long && *self.idx(orig + dir * 3) != Sq(None)
+                        {
                             return;
                         }
-                        if moves.len() > orig_len {
+                        // also make sure the king didn't move there by capture
+                        if moves.len() > orig_len && moves.last().unwrap().mv.capture.is_none() {
                             add_move!(orig + dir * 2, Some(MvExtra::Castle(side)));
                         }
                     };
@@ -298,8 +311,11 @@ impl State {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn test_move(moves_str: &str) -> Option<Move> {
-        let mut state = State::default();
+    use crate::chess::consts;
+    fn test_move(st: Option<&str>, moves_str: &str) -> Option<Move> {
+        let mut state: State = st
+            .and_then(|s| Some(str::parse(s).unwrap()))
+            .unwrap_or_default();
         let mut moves: Vec<&str> = moves_str.split(" ").collect();
         let last = moves.pop().unwrap();
 
@@ -309,10 +325,14 @@ mod test {
     }
     #[test]
     fn king_into_check() {
-        assert!(test_move("b2b3 e7e5 c1a3 e8e7").is_none());
+        assert!(test_move(None, "b2b3 e7e5 c1a3 e8e7").is_none());
     }
     #[test]
     fn wacky_bongcloud() {
-        assert!(test_move("d2d3 a7a5 e1d2").is_some());
+        assert!(test_move(None, "d2d3 a7a5 e1d2").is_some());
+    }
+    #[test]
+    fn kiwipete_pawn_no_castle() {
+        assert!(test_move(Some(consts::KIWIPETE), "a1b1 h3g2 e1g1").is_none());
     }
 }

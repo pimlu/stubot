@@ -8,10 +8,11 @@ use std::str;
 
 // row major
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
-pub fn castle_rook_col(side: CastleSide) -> i8 {
-    match side {
-        CastleSide::Long => 3,
-        CastleSide::Short => 5,
+
+pub fn rel_y(clr: Color, y: i8) -> i8 {
+    match clr {
+        Color::White => y,
+        Color::Black => BOARD_DIM.y - 1 - y,
     }
 }
 

@@ -1,9 +1,9 @@
 use super::*;
 
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead, Error, Read, Write};
 
 // want to deploy this elsewhere eventually, so streams are generic
-pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) {
+pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Error> {
     let w = &mut stdout;
     let mut stdin = io::BufReader::new(stdin_);
     let mut line_buf = String::new();
@@ -12,70 +12,75 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) {
     let mut state: chess::State = Default::default();
 
     while stdin.read_line(&mut line_buf).unwrap() > 0 {
-        let line = line_buf.trim();
-        let cmd = |name: &str| {
-            let full_name = format!("{} ", name);
-            if line == name {
-                return Some("".to_string());
-            } else if line.starts_with(&full_name) {
-                Some(line[full_name.len()..].to_string())
-            } else {
-                None
+        // remaining data not consumed by the command process
+        let mut rem = line_buf.trim();
+        // kinda like strip_prefix if it was stable
+        let mut cmd = |name: &str| {
+            if rem.starts_with(name) {
+                rem = &rem[name.len()..].trim_start();
+                return true;
             }
+            false
         };
-        let parse_n = |n: String, def| str::parse(n.as_str()).unwrap_or(def);
-        if let Some(_) = cmd("uci") {
-            writeln!(w, "id name stubot 1.0");
-            writeln!(w, "id author Stuart Geipel");
-            writeln!(w, "uciok");
-        } else if let Some(_) = cmd("debug") {
+        let parse_n = |n, def| str::parse(n).unwrap_or(def);
+        if cmd("uci") {
+            writeln!(w, "id name stubot 1.0")?;
+            writeln!(w, "id author Stuart Geipel")?;
+            writeln!(w, "uciok")?;
+        } else if cmd("debug") {
             // nothing for now
-        } else if let Some(_) = cmd("isready") {
-            writeln!(w, "readyok");
-        } else if let Some(_) = cmd("setoption name") {
+        } else if cmd("isready") {
+            writeln!(w, "readyok")?;
+        } else if cmd("setoption name") {
             // nothing for now
-        } else if let Some(_) = cmd("register") {
+        } else if cmd("register") {
             // nothing for now
-        } else if let Some(_) = cmd("ucinewgame") {
+        } else if cmd("ucinewgame") {
             state = Default::default();
-        } else if let Some(arg) = cmd("position") {
-            let parts: Vec<_> = arg.split(" moves ").collect();
+        } else if cmd("position") {
+            let parts: Vec<_> = rem.split(" moves ").collect();
             state = match parts[0] {
                 "startpos" => Default::default(),
-                s => str::parse(s).unwrap()
+                s => {
+                    assert!(s.starts_with("fen "));
+                    str::parse(&s[4..]).unwrap()
+                }
             };
             if let Some(moves) = parts.get(1) {
                 state.run_moves(moves.split(" "));
             }
-        } else if let Some(_) = cmd("go") {
+        } else if cmd("go") {
             // nothing for now
-        } else if let Some(_) = cmd("stop") {
+        } else if cmd("stop") {
             // nothing for now
-        } else if let Some(_) = cmd("quit") {
+        } else if cmd("quit") {
             std::process::exit(0);
-        } else if let Some(moves) = cmd("move") {
-            state.run_moves(moves.split(" "));
-        } else if let Some(mv_str) = cmd("safe_move") {
-            // when unmake_move trashes the state, we can't trust movegen.
+        } else if cmd("move") {
+            state.run_moves(rem.split(" "));
+        } else if cmd("safe_move") {
+            // when unmake_move trashes the state, we can't trust movegen much
             let mut cpy = state.clone();
-            if let Some(mv) = cpy.find_move(mv_str.as_str()) {
-                state.make_move(mv.mv);
+            if let Some(meta) = cpy.find_move(rem) {
+                writeln!(w, "{:?}", meta.mv)?;
+                state.make_move(meta.mv);
             } else {
-                writeln!(w, "no match");
+                writeln!(w, "no match")?;
             }
-        } else if let Some(count) = cmd("unmove") {
-            for _ in 0..parse_n(count, 1) {
+        } else if cmd("unmove") {
+            for _ in 0..parse_n(rem, 1) {
                 state.unmake_move();
             }
-        } else if let Some(_) = cmd("pprint") {
-            writeln!(w, "{}", state.board_string());
-        }  else if let Some(depth) = cmd("perft") {
-            cmds::perftree(&mut state, parse_n(depth, 1));
+        } else if cmd("pprint") {
+            writeln!(w, "{}", state.board_string())?;
+        } else if cmd("perft") {
+            cmds::perftree(&mut state, parse_n(rem, 1));
         } else {
-            writeln!(w, "Unknown command: {}", line);
+            writeln!(w, "Unknown command: {}", rem)?;
         }
         w.flush().unwrap();
         // read_line appends, clear buffer
         line_buf = String::new();
     }
+
+    Ok(())
 }

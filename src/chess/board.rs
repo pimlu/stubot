@@ -35,13 +35,21 @@ pub struct State {
     extras: Vec<StateExtra>,
     moves: Vec<Move>,
 }
-
+// returns x value (src, dst)
+pub fn castle_rook_path(clr: Color, side: CastleSide) -> (Pos, Pos) {
+    let (src, dst) = match side {
+        CastleSide::Long => (0, 3),
+        CastleSide::Short => (7, 5),
+    };
+    let y = rel_y(clr, 0);
+    (Pos { x: src, y }, Pos { x: dst, y })
+}
 // gets the position of the taken pawn from en passant
 fn en_passant_cap(mv: Move) -> Pos {
     // x/col of dest sq, y/row of src sq
     Pos {
         x: mv.b.x,
-        y: mv.a.x,
+        y: mv.a.y,
     }
 }
 
@@ -125,17 +133,38 @@ impl State {
                 self.set(en_passant_cap(mv), Sq(None));
             }
             Some(MvExtra::Promote(typ)) => a_pc.typ = typ,
-            Some(MvExtra::Castle(_side)) => (),
+            Some(MvExtra::Castle(side)) => {
+                let (src, dst) = castle_rook_path(self.turn(), side);
+                self.set(src, Sq(None));
+                self.set(dst, Sq::new(self.turn(), Type::Rook));
+            }
             None => (),
         }
-
-        // prep for en passant next move
         let mut st_extra = self.cur_extra;
-        if a_pc.typ == Type::Pawn && (mv.b.y - mv.a.y).abs() == 2 {
-            st_extra.enp = mv.a.x;
-        } else {
-            st_extra.enp = -1;
+        st_extra.enp = -1;
+        match a_pc.typ {
+            Type::Pawn =>
+            // prep for en passant next move
+            {
+                if (mv.b.y - mv.a.y).abs() == 2 {
+                    st_extra.enp = mv.a.x;
+                }
+            }
+            Type::King => {
+                st_extra.set_castle(self.turn(), CastleSide::Long, false);
+                st_extra.set_castle(self.turn(), CastleSide::Short, false);
+            }
+            Type::Rook => {
+                for &side in &[CastleSide::Long, CastleSide::Short] {
+                    // if the rook is moving away from its original position
+                    if mv.a == castle_rook_path(self.turn(), side).0 {
+                        st_extra.set_castle(self.turn(), side, false)
+                    }
+                }
+            }
+            _ => (),
         }
+
         self.commit_extra(st_extra);
 
         // move the pieces
@@ -147,7 +176,7 @@ impl State {
     }
     pub fn unmake_move(&mut self) {
         self.ply -= 1;
-        let mut st_extra = self.extras.pop().unwrap();
+        let st_extra = self.extras.pop().unwrap();
 
         let mut mv = self.moves.pop().unwrap();
 
@@ -168,7 +197,11 @@ impl State {
                 self.set(en_passant_cap(mv), enemy_sq(Type::Pawn));
             }
             Some(MvExtra::Promote(_)) => b_pc.typ = Type::Pawn,
-            Some(MvExtra::Castle(_side)) => (),
+            Some(MvExtra::Castle(side)) => {
+                let (src, dst) = castle_rook_path(self.turn(), side);
+                self.set(dst, Sq(None));
+                self.set(src, Sq::new(self.turn(), Type::Rook));
+            }
             None => (),
         }
 
