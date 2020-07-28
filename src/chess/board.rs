@@ -92,10 +92,13 @@ impl State {
     pub fn set_king_pos(&mut self, clr: Color, pos: Pos) {
         self.king_pos[clr as usize] = pos;
     }
+    pub fn move_len(&self) -> usize {
+        self.moves.len()
+    }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
-    pub fn make_move(&mut self, mv: Move) -> Option<Type> {
+    pub fn make_move(&mut self, mut mv: Move) {
         // extra moves/metadata is per make_move, should match
         debug_assert!(self.extras.len() == self.moves.len());
         // copy extra data and push
@@ -104,7 +107,7 @@ impl State {
 
         // moving from a to b
         let mut a_pc = self.idx(mv.a).0.unwrap();
-        let b_sq = self.idx(mv.b);
+        let &b_sq = self.idx(mv.b);
 
         // ensure we are allowed to move the piece
         debug_assert!(a_pc.clr == self.turn());
@@ -115,16 +118,10 @@ impl State {
             Sq(None) => true,
         });
 
-        // return capture
-        let mut cap = match b_sq {
-            Sq(Some(pc)) => Some(pc.typ),
-            Sq(None) => None,
-        };
-
         match mv.extra {
             Some(MvExtra::EnPassant) => {
-                debug_assert!(a_pc.typ == Type::Pawn && cap == None);
-                cap = Some(Type::Pawn);
+                debug_assert!(a_pc.typ == Type::Pawn && b_sq == Sq(None));
+                mv.capture = None;
                 self.set(en_passant_cap(mv), Sq(None));
             }
             Some(MvExtra::Promote(typ)) => a_pc.typ = typ,
@@ -147,8 +144,6 @@ impl State {
 
         // don't change self.turn() till the end
         self.ply += 1;
-
-        cap
     }
     pub fn unmake_move(&mut self) {
         self.ply -= 1;

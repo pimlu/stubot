@@ -24,12 +24,9 @@ pub fn perftree(state: &mut chess::State, depth: u32) -> String {
         .map(|meta| {
             let mv = meta.mv;
 
-            let cpy = state.clone();
             state.make_move(mv);
             let nodes = cmds::perft(state, depth - 1);
             state.unmake_move();
-            // kinda expensive unmake comparison test
-            debug_assert!(*state == cpy);
 
             sum += nodes;
             (mv.to_string(), nodes)

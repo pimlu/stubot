@@ -66,18 +66,32 @@ pub struct MvMeta {
     pub score: i16,
 }
 
+fn rel_y(clr: Color, y: i8) -> i8 {
+    match clr {
+        Color::White => y,
+        Color::Black => BOARD_DIM.y - 1 - y
+    }
+}
+
 impl State {
-    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
+    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mut mv: Move) {
         let clr = self.turn();
+
+        // kinda expensive unmake comparison test
+        let cpy = self.clone();
+
         self.make_move(mv);
         let king_pos = *self.get_king_pos(clr);
         // make sure there is actually a king where we are guarding
         // for check
         debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
         if !self.is_attacked(king_pos, clr.other()) {
-            moves.push(MvMeta { mv, score: 0 });
+            moves.push(MvMeta { mv,  score: 0 });
         }
         self.unmake_move();
+
+        // kinda expensive unmake comparison test
+        debug_assert!(*self == cpy);
     }
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
         use std::cell::Cell;
@@ -136,24 +150,20 @@ impl State {
         &mut self,
         gate: impl Fn(bool) -> bool,
         moves: &mut Vec<MvMeta>,
-        orig: Pos,
-        pos: Pos,
+        mut mv: Move
     ) -> bool {
-        let mut mv = Move {
-            a: orig,
-            b: pos,
-            capture: None,
-            extra: None,
-        };
-        let pos_sq = match self.get(pos) {
+        if mv.extra == Some(MvExtra::EnPassant) {
+            mv.capture = Some(Type::Pawn);
+        }
+        let b_sq = match self.get(mv.b) {
             Some(sq) => *sq,
             None => return false,
         };
-        if !gate(pos_sq.0.is_some()) {
+        if !gate(b_sq.0.is_some()) {
             return false;
         }
 
-        let Piece { clr, typ } = match pos_sq {
+        let Piece { clr, typ } = match b_sq {
             Sq(Some(pc)) => pc,
             Sq(None) => {
                 self.add_sudo(moves, mv);
@@ -171,18 +181,32 @@ impl State {
     // (if our code is correct)
     pub fn get_moves(&mut self) -> Vec<MvMeta> {
         let mut moves = Vec::<MvMeta>::new();
+        let enp = self.get_extra().enp;
         let mut add_moves = |orig| {
-            macro_rules! special_move {
-                ($dir:expr, $is_take:expr) => {
-                    self.try_move(|take| take == $is_take, &mut moves, orig, orig + $dir)
+            macro_rules! try_move {
+                ($gate: expr, $extra: expr) => {
+                    |pos| self.try_move($gate, &mut moves, Move {
+                        a: orig,
+                        b: pos,
+                        capture: None,
+                        extra: $extra
+                    })
                 };
             }
-            macro_rules! try_move {
+            macro_rules! pawn_move {
+                ($pos:expr, $is_take:expr) => {
+                    try_move!(|take| take == $is_take, None)($pos)
+                };
+            }
+            macro_rules! add_move {
                 () => {
-                    |pos| self.try_move(|_| true, &mut moves, orig, pos)
+                    try_move!(|_| true, None)
                 };
                 ($pos: expr) => {
-                    try_move!()($pos)
+                    add_move!()($pos)
+                };
+                ($pos: expr, $extra: expr) => {
+                    try_move!(|_| true, $extra)($pos)
                 };
             }
             let Piece { clr, typ } = match self.get(orig).unwrap() {
@@ -195,36 +219,39 @@ impl State {
 
             match typ {
                 Type::Pawn => {
-                    let home_row = orig.y
-                        == match clr {
-                            Color::White => 1,
-                            Color::Black => 6,
-                        };
                     let dir = pawn_dir(clr);
                     // move-onlies
-                    let first_push = special_move!(dir, false);
-                    if first_push && home_row {
-                        special_move!(dir * 2, false);
+                    let first_push = pawn_move!(orig + dir, false);
+                    if first_push && orig.y == rel_y(clr, 1) {
+                        pawn_move!(orig + dir * 2, false);
                     }
+
                     // diagonal
-                    special_move!(dir + card::W, true);
-                    special_move!(dir + card::E, true);
+                    for &side in &[card::E, card::W] {
+                        let take_pos = orig + dir + side;
+                        pawn_move!(take_pos, true);
+                        // needs to be able to "take" the spot they skipped
+                        let y_match = orig.y == rel_y(clr.other(), 3);
+                        if enp >= 0 && take_pos.x == enp && y_match {
+                            add_move!(take_pos, Some(MvExtra::EnPassant));
+                        }
+                    }
                 }
-                Type::Knight => leaper(orig, KNIGHT_OPTS, try_move!()),
-                Type::Bishop => rider(orig, BISHOP_OPTS, try_move!()),
-                Type::Rook => rider(orig, ROOK_OPTS, try_move!()),
+                Type::Knight => leaper(orig, KNIGHT_OPTS, add_move!()),
+                Type::Bishop => rider(orig, BISHOP_OPTS, add_move!()),
+                Type::Rook => rider(orig, ROOK_OPTS, add_move!()),
                 Type::Queen => {
-                    rider(orig, BISHOP_OPTS, try_move!());
-                    rider(orig, ROOK_OPTS, try_move!());
+                    rider(orig, BISHOP_OPTS, add_move!());
+                    rider(orig, ROOK_OPTS, add_move!());
                 }
                 Type::King => {
-                    leaper(orig, KING_OPTS, try_move!());
+                    leaper(orig, KING_OPTS, add_move!());
                     // first add the left/right moves. if they pass sudo test,
                     // the move len will increase. we check that and castle
                     // rights.
                     let mut try_castle_side = |dir, side| {
                         let orig_len = moves.len();
-                        try_move!(orig + dir);
+                        add_move!(orig + dir);
                         let rights = *self.get_extra().get_castle(clr, side);
                         // also check that the extra queenside spot is free
                         let q_blocked =
@@ -233,7 +260,7 @@ impl State {
                             return;
                         }
                         if moves.len() > orig_len {
-                            try_move!(orig + dir * 2);
+                            add_move!(orig + dir * 2, Some(MvExtra::Castle(side)));
                         }
                     };
                     try_castle_side(card::W, CastleSide::Long);
@@ -259,7 +286,7 @@ impl State {
     }
     // make matching moves in sequence
     pub fn run_moves<'a>(&mut self, moves_str: impl Iterator<Item = &'a str>) {
-        for mv_str in moves_str {
+        for mv_str in moves_str.filter(|s| !s.is_empty()) {
             match self.find_move(mv_str) {
                 Some(meta) => self.make_move(meta.mv),
                 None => panic!("no matching move {}", mv_str),

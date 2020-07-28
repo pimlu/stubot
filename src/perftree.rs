@@ -15,7 +15,7 @@ fn main() {
         moves_src = args[3].to_string();
     }
 
-    state.run_moves(moves_src.split(" ").filter(|s| !s.is_empty()));
+    state.run_moves(moves_src.split(" "));
 
     println!("{}", cmds::perftree(&mut state, depth));
 }
