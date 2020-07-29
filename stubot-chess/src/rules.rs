@@ -186,7 +186,7 @@ impl State {
     // requires a mutable reference, but doesn't actually modify anything
     // (if our code is correct)
     pub fn get_sudo_moves(&mut self, moves: &mut Vec<MvMeta>) {
-        debug_assert!(moves.is_empty());
+        moves.clear();
 
         let enp = self.get_extra().enp;
         let mut add_moves = |orig| {
@@ -316,15 +316,27 @@ impl State {
     }
 
     pub fn perft(&mut self, depth: u32) -> u64 {
+        self.perft_(depth, &mut vec![vec![]; depth as usize][..])
+    }
+    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<MvMeta>]) -> u64 {
         if depth == 0 {
             return 1;
         }
-        let moves = self.get_moves();
+
+        let (moves, rest) = stack.split_first_mut().unwrap();
+
+        self.get_sudo_moves(moves);
+
         moves
             .iter()
             .map(|meta| {
                 self.make_move(meta.mv);
-                let nodes = self.perft(depth - 1);
+
+                let nodes = if !self.in_check(self.turn().other()) {
+                    self.perft_(depth - 1, rest)
+                } else {
+                    0
+                };
                 self.unmake_move();
                 nodes
             })
@@ -333,6 +345,7 @@ impl State {
 
     pub fn perftree(&mut self, depth: u32) -> String {
         let mut sum: u64 = 0;
+        let mut stack = vec![vec![]; depth as usize];
         let mut moves: Vec<_> = self
             .get_moves()
             .iter()
@@ -340,7 +353,7 @@ impl State {
                 let mv = meta.mv;
 
                 self.make_move(mv);
-                let nodes = self.perft(depth - 1);
+                let nodes = self.perft_(depth - 1, &mut stack[..]);
                 self.unmake_move();
 
                 sum += nodes;
