@@ -8,3 +8,6 @@ default-members = [
     "stubot-chess",
     "stubot-uci"
 ]
+
+[profile.release]
+debug = true

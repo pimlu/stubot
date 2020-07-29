@@ -50,15 +50,6 @@ const ROOK_OPTS: &[Pos] = &[
     Pos { x: 0, y: 1 },
     Pos { x: 0, y: -1 },
 ];
-// Everything but left and right (which are special)
-const KING_OPTS: &[Pos] = &[
-    Pos { x: 1, y: 1 },
-    Pos { x: 1, y: -1 },
-    Pos { x: -1, y: 1 },
-    Pos { x: -1, y: -1 },
-    Pos { x: 0, y: 1 },
-    Pos { x: 0, y: -1 },
-];
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MvMeta {
@@ -68,18 +59,11 @@ pub struct MvMeta {
 
 impl State {
     fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
-        let clr = self.turn();
-
-        // kinda expensive unmake comparison test
         #[cfg(test)]
         let mut cpy = self.clone();
 
         self.make_move(mv);
-        // make sure there is actually a king where we are guarding
-        // for check
-        if !self.in_check(clr) {
-            moves.push(MvMeta { mv, score: 0 });
-        }
+        moves.push(MvMeta { mv, score: 0 });
         self.unmake_move();
 
         // kinda expensive unmake comparison test
@@ -184,11 +168,26 @@ impl State {
         }
         return false;
     }
+    pub fn is_legal(&mut self, mv: Move) -> bool {
+        self.make_move(mv);
+        // only extra condition for a psuedo move is check
+        let legal = !self.in_check(self.turn().other());
+        self.unmake_move();
+        legal
+    }
+
+    pub fn get_moves(&mut self) -> Vec<MvMeta> {
+        let mut moves = Vec::new();
+        self.get_sudo_moves(&mut moves);
+        moves.retain(|meta| self.is_legal(meta.mv));
+        moves
+    }
 
     // requires a mutable reference, but doesn't actually modify anything
     // (if our code is correct)
-    pub fn get_moves(&mut self) -> Vec<MvMeta> {
-        let mut moves = Vec::<MvMeta>::new();
+    pub fn get_sudo_moves(&mut self, moves: &mut Vec<MvMeta>) {
+        debug_assert!(moves.is_empty());
+
         let enp = self.get_extra().enp;
         let mut add_moves = |orig| {
             let Piece { clr, typ } = match self.get(orig).unwrap() {
@@ -200,7 +199,7 @@ impl State {
                     |pos| {
                         self.try_move(
                             $gate,
-                            &mut moves,
+                            moves,
                             Move {
                                 a: orig,
                                 b: pos,
@@ -267,18 +266,14 @@ impl State {
                     rider(orig, ROOK_OPTS, add_move!());
                 }
                 Type::King => {
-                    leaper(orig, KING_OPTS, add_move!());
-                    // first add the left/right moves. if they pass sudo test,
-                    // the move len will increase. we check that and castle
-                    // rights.
+                    leaper(orig, BISHOP_OPTS, add_move!());
+                    leaper(orig, ROOK_OPTS, add_move!());
                     let mut try_castle_side = |dir, side| {
-                        let orig_len = moves.len();
-                        add_move!(orig + dir);
-                        let rights = *self.get_extra().get_castle(clr, side);
-                        if !rights || moves.len() == orig_len {
+                        // must have castle rights
+                        if !*self.get_extra().get_castle(clr, side) {
                             return;
                         }
-                        // loop across the rook path shoould be clear
+                        // loop across the rook path, should be clear
                         let (src, mut dst) = castle_rook_path(clr, side);
                         while dst != src {
                             if *self.idx(dst) != Sq(None) {
@@ -286,8 +281,8 @@ impl State {
                             }
                             dst += dir;
                         }
-                        // lastly, can't castle out of check
-                        if !self.in_check(clr) {
+                        // lastly, can't castle out of/through check
+                        if !self.in_check(clr) && !self.is_attacked(orig + dir, clr.other()) {
                             add_move!(orig + dir * 2, Some(MvExtra::Castle(side)));
                         }
                     };
@@ -301,7 +296,6 @@ impl State {
                 add_moves(Pos { y, x });
             }
         }
-        moves
     }
     // find move with matching to_str
     pub fn find_move(&mut self, mv_str: &str) -> Option<MvMeta> {
