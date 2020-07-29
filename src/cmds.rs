@@ -65,6 +65,29 @@ mod test {
         test_position(&mut state, vec![48, 2039, 97862]);
     }
 
+    #[test]
+    fn test_pos_3() {
+        let mut state: chess::State = str::parse(consts::POS_3).unwrap();
+        test_position(&mut state, vec![14, 191, 2812, 43238]);
+    }
+    #[test]
+    fn test_pos_4() {
+        let mut state: chess::State = str::parse(consts::POS_4).unwrap();
+        test_position(&mut state, vec![6, 264, 9467]);
+    }
+
+    #[test]
+    fn test_pos_5() {
+        let mut state: chess::State = str::parse(consts::POS_5).unwrap();
+        test_position(&mut state, vec![44, 1486, 62379]);
+    }
+
+    #[test]
+    fn test_pos_6() {
+        let mut state: chess::State = str::parse(consts::POS_6).unwrap();
+        test_position(&mut state, vec![46, 2079, 89890]);
+    }
+
     fn test_position(state: &mut chess::State, nodes: Vec<u64>) {
         let orig = state.clone();
         for (d, &n) in nodes.iter().enumerate() {

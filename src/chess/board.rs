@@ -164,6 +164,15 @@ impl State {
             }
             _ => (),
         }
+        // if you take someone's rook, reset castling rights
+        if mv.capture == Some(Type::Rook) {
+            let enemy = self.turn().other();
+            for &side in &[CastleSide::Long, CastleSide::Short] {
+                if mv.b == castle_rook_path(enemy, side).0 {
+                    st_extra.set_castle(enemy, side, false);
+                }
+            }
+        }
 
         self.commit_extra(st_extra);
 
@@ -276,6 +285,12 @@ impl str::FromStr for State {
             state.ply = 2 * (full_u - 1) + clr_add;
 
             let mut extra = StateExtra::zero_init();
+            match str::parse::<Pos>(enp) {
+                Ok(pos) => {
+                    extra.enp = pos.x;
+                }
+                _ => (),
+            }
             for c in castle.chars() {
                 let (clr, side) = match c {
                     'q' => (Color::Black, CastleSide::Long),

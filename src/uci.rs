@@ -1,6 +1,6 @@
 use super::*;
 
-use std::io::{self, BufRead, Error, Read, Write};
+use std::io::{self, BufRead, Error};
 
 // want to deploy this elsewhere eventually, so streams are generic
 pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Error> {
@@ -67,7 +67,11 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
                 writeln!(w, "no match")?;
             }
         } else if cmd("unmove") {
-            for _ in 0..parse_n(rem, 1) {
+            for i in 0..parse_n(rem, 1) {
+                if state.move_len() == 0 {
+                    writeln!(w, "out of moves, unmade {}", i)?;
+                    break;
+                }
                 state.unmake_move();
             }
         } else if cmd("pprint") {

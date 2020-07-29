@@ -75,11 +75,9 @@ impl State {
         let mut cpy = self.clone();
 
         self.make_move(mv);
-        let king_pos = *self.get_king_pos(clr);
         // make sure there is actually a king where we are guarding
         // for check
-        debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
-        if !self.is_attacked(king_pos, clr.other()) {
+        if !self.in_check(clr) {
             moves.push(MvMeta { mv, score: 0 });
         }
         self.unmake_move();
@@ -98,9 +96,13 @@ impl State {
             assert!(false);
         }
     }
+    fn in_check(&self, clr: Color) -> bool {
+        let king_pos = *self.get_king_pos(clr);
+        debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
+        self.is_attacked(king_pos, clr.other())
+    }
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
         use std::cell::Cell;
-
         let enemy_knight = Sq::new(enemy, Type::Knight);
         for &opt in KNIGHT_OPTS {
             if self.get(orig + opt) == Some(&enemy_knight) {
@@ -189,6 +191,10 @@ impl State {
         let mut moves = Vec::<MvMeta>::new();
         let enp = self.get_extra().enp;
         let mut add_moves = |orig| {
+            let Piece { clr, typ } = match self.get(orig).unwrap() {
+                Sq(Some(pc)) => *pc,
+                Sq(None) => return,
+            };
             macro_rules! try_move {
                 ($gate: expr, $extra: expr) => {
                     |pos| {
@@ -207,7 +213,14 @@ impl State {
             }
             macro_rules! pawn_move {
                 ($pos:expr, $is_take:expr) => {
-                    try_move!(|take| take == $is_take, None)($pos)
+                    if orig.y == rel_y(clr.other(), 1) {
+                        for &typ in &[Type::Knight, Type::Bishop, Type::Rook, Type::Queen] {
+                            try_move!(|take| take == $is_take, Some(MvExtra::Promote(typ)))($pos);
+                        }
+                        false
+                    } else {
+                        try_move!(|take| take == $is_take, None)($pos)
+                    }
                 };
             }
             macro_rules! add_move {
@@ -221,10 +234,6 @@ impl State {
                     try_move!(|_| true, $extra)($pos)
                 };
             }
-            let Piece { clr, typ } = match self.get(orig).unwrap() {
-                Sq(Some(pc)) => *pc,
-                Sq(None) => return,
-            };
             if clr != self.turn() {
                 return;
             }
@@ -241,11 +250,12 @@ impl State {
                     // diagonal
                     for &side in &[card::E, card::W] {
                         let take_pos = orig + dir + side;
-                        pawn_move!(take_pos, true);
                         // needs to be able to "take" the spot they skipped
                         let y_match = orig.y == rel_y(clr.other(), 3);
                         if enp >= 0 && take_pos.x == enp && y_match {
                             add_move!(take_pos, Some(MvExtra::EnPassant));
+                        } else {
+                            pawn_move!(take_pos, true);
                         }
                     }
                 }
@@ -265,14 +275,19 @@ impl State {
                         let orig_len = moves.len();
                         add_move!(orig + dir);
                         let rights = *self.get_extra().get_castle(clr, side);
-                        // also check that the extra queenside spot is free
-                        if !rights
-                            || side == CastleSide::Long && *self.idx(orig + dir * 3) != Sq(None)
-                        {
+                        if !rights || moves.len() == orig_len {
                             return;
                         }
-                        // also make sure the king didn't move there by capture
-                        if moves.len() > orig_len && moves.last().unwrap().mv.capture.is_none() {
+                        // loop across the rook path shoould be clear
+                        let (src, mut dst) = castle_rook_path(clr, side);
+                        while dst != src {
+                            if *self.idx(dst) != Sq(None) {
+                                return;
+                            }
+                            dst += dir;
+                        }
+                        // lastly, can't castle out of check
+                        if !self.in_check(clr) {
                             add_move!(orig + dir * 2, Some(MvExtra::Castle(side)));
                         }
                     };
@@ -291,7 +306,6 @@ impl State {
     // find move with matching to_str
     pub fn find_move(&mut self, mv_str: &str) -> Option<MvMeta> {
         let moves = self.get_moves();
-        let names: Vec<_> = moves.iter().map(|meta| meta.mv.to_string()).collect();
         moves
             .iter()
             .find(|meta| meta.mv.to_string() == mv_str)
@@ -334,5 +348,13 @@ mod test {
     #[test]
     fn kiwipete_pawn_no_castle() {
         assert!(test_move(Some(consts::KIWIPETE), "a1b1 h3g2 e1g1").is_none());
+    }
+    #[test]
+    fn kiwipete_castle_out_of_check() {
+        assert!(test_move(Some(consts::KIWIPETE), "a1b1 f6d5 f3f7 e8c8").is_none());
+    }
+    #[test]
+    fn kiwipete_no_castle_take() {
+        assert!(test_move(Some(consts::KIWIPETE), "e2a6 b4b3 a6c8 e8c8").is_none());
     }
 }
