@@ -320,12 +320,63 @@ impl State {
             };
         }
     }
+
+    pub fn perft(&mut self, depth: u32) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+        let moves = self.get_moves();
+        moves
+            .iter()
+            .map(|meta| {
+                self.make_move(meta.mv);
+                let nodes = self.perft(depth - 1);
+                self.unmake_move();
+                nodes
+            })
+            .sum()
+    }
+
+    pub fn perftree(&mut self, depth: u32) -> String {
+        let mut sum: u64 = 0;
+        let mut moves: Vec<_> = self
+            .get_moves()
+            .iter()
+            .map(|meta| {
+                let mv = meta.mv;
+
+                self.make_move(mv);
+                let nodes = self.perft(depth - 1);
+                self.unmake_move();
+
+                sum += nodes;
+                (mv.to_string(), nodes)
+            })
+            .collect();
+
+        moves.sort_by_key(|tup| tup.0.to_string());
+
+        format!(
+            "{}\n\n{}",
+            moves
+                .iter()
+                .map(|(mv, n)| format!("{} {}", mv, n))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            sum
+        )
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::chess::consts;
+    const KIWIPETE: &str = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+    const POS_3: &str = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
+    const POS_4: &str = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
+    const POS_5: &str = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
+    const POS_6: &str = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+
     fn test_move(st: Option<&str>, moves_str: &str) -> Option<Move> {
         let mut state: State = st
             .and_then(|s| Some(str::parse(s).unwrap()))
@@ -347,14 +398,56 @@ mod test {
     }
     #[test]
     fn kiwipete_pawn_no_castle() {
-        assert!(test_move(Some(consts::KIWIPETE), "a1b1 h3g2 e1g1").is_none());
+        assert!(test_move(Some(KIWIPETE), "a1b1 h3g2 e1g1").is_none());
     }
     #[test]
     fn kiwipete_castle_out_of_check() {
-        assert!(test_move(Some(consts::KIWIPETE), "a1b1 f6d5 f3f7 e8c8").is_none());
+        assert!(test_move(Some(KIWIPETE), "a1b1 f6d5 f3f7 e8c8").is_none());
     }
     #[test]
     fn kiwipete_no_castle_take() {
-        assert!(test_move(Some(consts::KIWIPETE), "e2a6 b4b3 a6c8 e8c8").is_none());
+        assert!(test_move(Some(KIWIPETE), "e2a6 b4b3 a6c8 e8c8").is_none());
+    }
+
+    fn test_position(state: &mut State, nodes: Vec<u64>) {
+        use pretty_assertions::assert_eq;
+        let orig = state.clone();
+        for (d, &n) in nodes.iter().enumerate() {
+            let count = state.perft((d + 1) as u32);
+            assert_eq!(orig, *state);
+            assert_eq!(n, count);
+        }
+    }
+
+    #[test]
+    fn test_initial() {
+        let mut state: State = Default::default();
+        test_position(&mut state, vec![20, 400, 8902]);
+    }
+
+    #[test]
+    fn test_kiwipete() {
+        let mut state: State = str::parse(KIWIPETE).unwrap();
+        test_position(&mut state, vec![48, 2039, 97862]);
+    }
+    #[test]
+    fn test_pos_3() {
+        let mut state: State = str::parse(POS_3).unwrap();
+        test_position(&mut state, vec![14, 191, 2812, 43238]);
+    }
+    #[test]
+    fn test_pos_4() {
+        let mut state: State = str::parse(POS_4).unwrap();
+        test_position(&mut state, vec![6, 264, 9467]);
+    }
+    #[test]
+    fn test_pos_5() {
+        let mut state: State = str::parse(POS_5).unwrap();
+        test_position(&mut state, vec![44, 1486, 62379]);
+    }
+    #[test]
+    fn test_pos_6() {
+        let mut state: State = str::parse(POS_6).unwrap();
+        test_position(&mut state, vec![46, 2079, 89890]);
     }
 }

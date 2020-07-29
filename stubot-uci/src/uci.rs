@@ -1,5 +1,3 @@
-use super::*;
-
 use std::io::{self, BufRead, Error};
 
 // want to deploy this elsewhere eventually, so streams are generic
@@ -24,7 +22,7 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
         };
         let parse_n = |n, def| str::parse(n).unwrap_or(def);
         if cmd("uci") {
-            writeln!(w, "id name stubot 1.0")?;
+            writeln!(w, "id name stubot {}", env!("CARGO_PKG_VERSION"))?;
             writeln!(w, "id author Stuart Geipel")?;
             writeln!(w, "uciok")?;
         } else if cmd("debug") {
@@ -77,7 +75,7 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
         } else if cmd("pprint") {
             writeln!(w, "{}", state.board_string())?;
         } else if cmd("perft") {
-            cmds::perftree(&mut state, parse_n(rem, 1));
+            writeln!(w, "{}", state.perftree(parse_n(rem, 1)))?;
         } else {
             writeln!(w, "Unknown command: {}", rem)?;
         }

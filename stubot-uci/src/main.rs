@@ -1,5 +1,3 @@
-mod chess;
-mod cmds;
 mod uci;
 
 use std::io;

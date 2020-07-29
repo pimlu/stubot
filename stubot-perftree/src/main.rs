@@ -1,8 +1,4 @@
-mod chess;
-mod cmds;
-
 use std::env;
-use std::io;
 use std::str;
 
 fn main() {
@@ -17,5 +13,5 @@ fn main() {
 
     state.run_moves(moves_src.split(" "));
 
-    println!("{}", cmds::perftree(&mut state, depth));
+    println!("{}", state.perftree(depth));
 }

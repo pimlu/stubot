@@ -1,6 +1,4 @@
 mod board;
-#[cfg(test)]
-pub mod consts;
 mod rules;
 mod structs;
 
