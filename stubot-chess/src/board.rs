@@ -34,6 +34,7 @@ pub struct State {
     cur_extra: StateExtra,
     extras: Vec<StateExtra>,
     moves: Vec<Move>,
+    fast_eval: FastEval,
 }
 // returns x value (src, dst)
 pub fn castle_rook_path(clr: Color, side: CastleSide) -> (Pos, Pos) {
@@ -69,6 +70,8 @@ impl State {
         self.get(pos).unwrap()
     }
     fn set(&mut self, pos: Pos, x: Sq) {
+        self.fast_eval.change(false, *self.idx(pos), pos);
+        self.fast_eval.change(true, x, pos);
         let sq = self.get_mut(pos).unwrap();
         *sq = x;
         let Piece { clr, typ } = match x {
@@ -102,6 +105,9 @@ impl State {
     }
     pub fn move_len(&self) -> usize {
         self.moves.len()
+    }
+    pub fn fast_score(&self) -> i16 {
+        self.fast_eval.score()
     }
     // in-place make move, returns capture if it ended up taking one.
     // only performs basic sanity checks. this simply writes the result
@@ -234,6 +240,7 @@ impl State {
             cur_extra: StateExtra::zero_init(),
             extras: vec![],
             moves: vec![],
+            fast_eval: Default::default(),
         }
     }
 }

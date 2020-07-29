@@ -3,6 +3,8 @@ use super::*;
 
 use std::cmp;
 
+use derive_more::{Add, AddAssign};
+
 fn pawn_dir(clr: Color) -> Pos {
     match clr {
         Color::White => card::N,
@@ -51,10 +53,19 @@ const ROOK_OPTS: &[Pos] = &[
     Pos { x: 0, y: -1 },
 ];
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 pub struct MvMeta {
     pub mv: Move,
     pub score: i16,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Default, Add, AddAssign)]
+pub struct Perft {
+    pub nodes: u64,
+    pub caps: u64,
+    pub enps: u64,
+    pub castles: u64,
+    pub promotions: u64,
 }
 
 impl State {
@@ -63,7 +74,10 @@ impl State {
         let mut cpy = self.clone();
 
         self.make_move(mv);
-        moves.push(MvMeta { mv, score: 0 });
+        moves.push(MvMeta {
+            mv,
+            score: self.fast_score(),
+        });
         self.unmake_move();
 
         // kinda expensive unmake comparison test
@@ -176,16 +190,16 @@ impl State {
         legal
     }
 
-    pub fn get_moves(&mut self) -> Vec<MvMeta> {
+    pub fn gen_moves(&mut self) -> Vec<MvMeta> {
         let mut moves = Vec::new();
-        self.get_sudo_moves(&mut moves);
+        self.gen_sudo_moves(&mut moves);
         moves.retain(|meta| self.is_legal(meta.mv));
         moves
     }
 
     // requires a mutable reference, but doesn't actually modify anything
     // (if our code is correct)
-    pub fn get_sudo_moves(&mut self, moves: &mut Vec<MvMeta>) {
+    pub fn gen_sudo_moves(&mut self, moves: &mut Vec<MvMeta>) {
         moves.clear();
 
         let enp = self.get_extra().enp;
@@ -299,7 +313,7 @@ impl State {
     }
     // find move with matching to_str
     pub fn find_move(&mut self, mv_str: &str) -> Option<MvMeta> {
-        let moves = self.get_moves();
+        let moves = self.gen_moves();
         moves
             .iter()
             .find(|meta| meta.mv.to_string() == mv_str)
@@ -314,46 +328,54 @@ impl State {
             };
         }
     }
-
-    pub fn perft(&mut self, depth: u32) -> u64 {
+    pub fn perft(&mut self, depth: u32) -> Perft {
         self.perft_(depth, &mut vec![vec![]; depth as usize][..])
     }
-    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<MvMeta>]) -> u64 {
+    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<MvMeta>]) -> Perft {
+        let mut res: Perft = Default::default();
         if depth == 0 {
-            return 1;
+            res.nodes = 1;
+            return res;
         }
 
         let (moves, rest) = stack.split_first_mut().unwrap();
 
-        self.get_sudo_moves(moves);
+        self.gen_sudo_moves(moves);
 
-        moves
-            .iter()
-            .map(|meta| {
-                self.make_move(meta.mv);
-
-                let nodes = if !self.in_check(self.turn().other()) {
-                    self.perft_(depth - 1, rest)
+        for meta in moves {
+            self.make_move(meta.mv);
+            if !self.in_check(self.turn().other()) {
+                if depth == 1 {
+                    res.nodes += 1;
+                    match meta.mv.extra {
+                        Some(MvExtra::Castle(_)) => res.castles += 1,
+                        Some(MvExtra::EnPassant) => res.enps += 1,
+                        Some(MvExtra::Promote(_)) => res.promotions += 1,
+                        None => (),
+                    }
+                    if let Some(_) = meta.mv.capture {
+                        res.caps += 1;
+                    }
                 } else {
-                    0
-                };
-                self.unmake_move();
-                nodes
-            })
-            .sum()
+                    res += self.perft_(depth - 1, rest);
+                }
+            }
+            self.unmake_move();
+        }
+        res
     }
 
     pub fn perftree(&mut self, depth: u32) -> String {
         let mut sum: u64 = 0;
         let mut stack = vec![vec![]; depth as usize];
         let mut moves: Vec<_> = self
-            .get_moves()
+            .gen_moves()
             .iter()
             .map(|meta| {
                 let mv = meta.mv;
 
                 self.make_move(mv);
-                let nodes = self.perft_(depth - 1, &mut stack[..]);
+                let nodes = self.perft_(depth - 1, &mut stack[..]).nodes;
                 self.unmake_move();
 
                 sum += nodes;
@@ -383,6 +405,7 @@ mod test {
     const POS_4: &str = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1";
     const POS_5: &str = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
     const POS_6: &str = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+    const DUB_M8: &str = "r3kb2/pp2qp2/2n2B2/8/2B1P3/2N2r2/PPPQ3P/2KR3R b q - 0 16";
 
     fn test_move(st: Option<&str>, moves_str: &str) -> Option<Move> {
         let mut state: State = st
@@ -418,10 +441,15 @@ mod test {
 
     fn test_position(state: &mut State, nodes: Vec<u64>) {
         use pretty_assertions::assert_eq;
-        let orig = state.clone();
+        for (d, &n) in nodes.iter().enumerate() {
+            let count = state.perft((d + 1) as u32).nodes;
+            assert_eq!(n, count);
+        }
+    }
+    fn test_precise(state: &mut State, nodes: Vec<Perft>) {
+        use pretty_assertions::assert_eq;
         for (d, &n) in nodes.iter().enumerate() {
             let count = state.perft((d + 1) as u32);
-            assert_eq!(orig, *state);
             assert_eq!(n, count);
         }
     }
@@ -435,7 +463,32 @@ mod test {
     #[test]
     fn test_kiwipete() {
         let mut state: State = str::parse(KIWIPETE).unwrap();
-        test_position(&mut state, vec![48, 2039, 97862]);
+        test_precise(
+            &mut state,
+            vec![
+                Perft {
+                    nodes: 48,
+                    caps: 8,
+                    enps: 0,
+                    castles: 2,
+                    promotions: 0,
+                },
+                Perft {
+                    nodes: 2039,
+                    caps: 351,
+                    enps: 1,
+                    castles: 91,
+                    promotions: 0,
+                },
+                Perft {
+                    nodes: 97862,
+                    caps: 17102,
+                    enps: 45,
+                    castles: 3162,
+                    promotions: 0,
+                },
+            ],
+        );
     }
     #[test]
     fn test_pos_3() {
@@ -456,5 +509,12 @@ mod test {
     fn test_pos_6() {
         let mut state: State = str::parse(POS_6).unwrap();
         test_position(&mut state, vec![46, 2079, 89890]);
+    }
+    // none of the 6 test positions have imminent mate threats in the first 3
+    // nodes. add a game that has mate threats so it can be counted
+    #[test]
+    fn test_dub_m8() {
+        let mut state: State = str::parse(DUB_M8).unwrap();
+        test_position(&mut state, vec![36, 1715, 62457]);
     }
 }

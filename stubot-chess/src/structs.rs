@@ -56,6 +56,16 @@ pub struct Pos {
     pub x: i8,
 }
 
+impl Pos {
+    pub fn color(&self) -> Color {
+        if (self.x + self.y) % 2 == 0 {
+            Color::Black
+        } else {
+            Color::White
+        }
+    }
+}
+
 pub mod card {
     use super::Pos;
     pub const N: Pos = Pos { x: 0, y: 1 };
@@ -219,5 +229,13 @@ mod test {
         test_pos("c8");
         test_pos("g1");
         assert_eq!("a1", Pos { x: 0, y: 0 }.to_string());
+        assert_eq!("c7", Pos { x: 2, y: 6 }.to_string());
+    }
+
+    #[test]
+    fn pos_color() {
+        let clr = |s| str::parse::<Pos>(s).unwrap().color();
+        assert_eq!(clr("a1"), Color::Black);
+        assert_eq!(clr("f5"), Color::White);
     }
 }
