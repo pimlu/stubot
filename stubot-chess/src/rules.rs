@@ -53,12 +53,6 @@ const ROOK_OPTS: &[Pos] = &[
     Pos { x: 0, y: -1 },
 ];
 
-#[derive(Debug, Copy, Clone)]
-pub struct MvMeta {
-    pub mv: Move,
-    pub score: i16,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Default, Add, AddAssign)]
 pub struct Perft {
     pub nodes: u64,
@@ -69,31 +63,6 @@ pub struct Perft {
 }
 
 impl State {
-    fn add_sudo(&mut self, moves: &mut Vec<MvMeta>, mv: Move) {
-        #[cfg(test)]
-        let mut cpy = self.clone();
-
-        self.make_move(mv);
-        moves.push(MvMeta {
-            mv,
-            score: self.fast_score(),
-        });
-        self.unmake_move();
-
-        // kinda expensive unmake comparison test
-        #[cfg(test)]
-        if *self != cpy {
-            println!("orig:");
-            println!("{}", cpy.board_string());
-            println!("then move {}:", mv);
-            println!("{:?}", mv);
-            cpy.make_move(mv);
-            println!("{}", cpy.board_string());
-            println!("unmade into:");
-            println!("{}", self.board_string());
-            assert!(false);
-        }
-    }
     fn in_check(&self, clr: Color) -> bool {
         let king_pos = *self.get_king_pos(clr);
         debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
@@ -152,12 +121,7 @@ impl State {
     // return value is unused in some cases.
     // except if gate(Sq) is false, it just stops early. gate is unused (just
     // returns true) in some cases.
-    fn try_move(
-        &mut self,
-        gate: impl Fn(bool) -> bool,
-        moves: &mut Vec<MvMeta>,
-        mut mv: Move,
-    ) -> bool {
+    fn try_move(&self, gate: impl Fn(bool) -> bool, moves: &mut Vec<Move>, mut mv: Move) -> bool {
         if mv.extra == Some(MvExtra::EnPassant) {
             mv.capture = Some(Type::Pawn);
         }
@@ -172,13 +136,13 @@ impl State {
         let Piece { clr, typ } = match b_sq {
             Sq(Some(pc)) => pc,
             Sq(None) => {
-                self.add_sudo(moves, mv);
+                moves.push(mv);
                 return true;
             }
         };
         if clr != self.turn() {
             mv.capture = Some(typ);
-            self.add_sudo(moves, mv);
+            moves.push(mv);
         }
         return false;
     }
@@ -190,16 +154,16 @@ impl State {
         legal
     }
 
-    pub fn gen_moves(&mut self) -> Vec<MvMeta> {
+    pub fn gen_moves(&mut self) -> Vec<Move> {
         let mut moves = Vec::new();
         self.gen_sudo_moves(&mut moves);
-        moves.retain(|meta| self.is_legal(meta.mv));
+        moves.retain(|&mv| self.is_legal(mv));
         moves
     }
 
     // requires a mutable reference, but doesn't actually modify anything
     // (if our code is correct)
-    pub fn gen_sudo_moves(&mut self, moves: &mut Vec<MvMeta>) {
+    pub fn gen_sudo_moves(&self, moves: &mut Vec<Move>) {
         moves.clear();
 
         let enp = self.get_extra().enp;
@@ -312,18 +276,15 @@ impl State {
         }
     }
     // find move with matching to_str
-    pub fn find_move(&mut self, mv_str: &str) -> Option<MvMeta> {
+    pub fn find_move(&mut self, mv_str: &str) -> Option<Move> {
         let moves = self.gen_moves();
-        moves
-            .iter()
-            .find(|meta| meta.mv.to_string() == mv_str)
-            .copied()
+        moves.iter().find(|mv| mv.to_string() == mv_str).copied()
     }
     // make matching moves in sequence
     pub fn run_moves<'a>(&mut self, moves_str: impl Iterator<Item = &'a str>) {
         for mv_str in moves_str.filter(|s| !s.is_empty()) {
             match self.find_move(mv_str) {
-                Some(meta) => self.make_move(meta.mv),
+                Some(mv) => self.make_move(mv),
                 None => panic!("no matching move {}", mv_str),
             };
         }
@@ -331,7 +292,7 @@ impl State {
     pub fn perft(&mut self, depth: u32) -> Perft {
         self.perft_(depth, &mut vec![vec![]; depth as usize][..])
     }
-    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<MvMeta>]) -> Perft {
+    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<Move>]) -> Perft {
         let mut res: Perft = Default::default();
         if depth == 0 {
             res.nodes = 1;
@@ -342,18 +303,20 @@ impl State {
 
         self.gen_sudo_moves(moves);
 
-        for meta in moves {
-            self.make_move(meta.mv);
+        for mv in moves {
+            #[cfg(test)]
+            let mut cpy = self.clone();
+            self.make_move(*mv);
             if !self.in_check(self.turn().other()) {
                 if depth == 1 {
                     res.nodes += 1;
-                    match meta.mv.extra {
+                    match mv.extra {
                         Some(MvExtra::Castle(_)) => res.castles += 1,
                         Some(MvExtra::EnPassant) => res.enps += 1,
                         Some(MvExtra::Promote(_)) => res.promotions += 1,
                         None => (),
                     }
-                    if let Some(_) = meta.mv.capture {
+                    if let Some(_) = mv.capture {
                         res.caps += 1;
                     }
                 } else {
@@ -361,6 +324,20 @@ impl State {
                 }
             }
             self.unmake_move();
+
+            // kinda expensive unmake comparison test
+            #[cfg(test)]
+            if *self != cpy {
+                println!("orig:");
+                println!("{}", cpy.board_string());
+                println!("then move {}:", mv);
+                println!("{:?}", mv);
+                cpy.make_move(*mv);
+                println!("{}", cpy.board_string());
+                println!("unmade into:");
+                println!("{}", self.board_string());
+                assert!(false);
+            }
         }
         res
     }
@@ -371,9 +348,7 @@ impl State {
         let mut moves: Vec<_> = self
             .gen_moves()
             .iter()
-            .map(|meta| {
-                let mv = meta.mv;
-
+            .map(|&mv| {
                 self.make_move(mv);
                 let nodes = self.perft_(depth - 1, &mut stack[..]).nodes;
                 self.unmake_move();
@@ -416,7 +391,7 @@ mod test {
 
         state.run_moves(moves.iter().map(|&s| s));
 
-        state.find_move(last).map(|meta| meta.mv)
+        state.find_move(last)
     }
     #[test]
     fn king_into_check() {

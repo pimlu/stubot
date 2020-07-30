@@ -58,9 +58,9 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
         } else if cmd("safe_move") {
             // when unmake_move trashes the state, we can't trust movegen much
             let mut cpy = state.clone();
-            if let Some(meta) = cpy.find_move(rem) {
-                writeln!(w, "{:?}", meta.mv)?;
-                state.make_move(meta.mv);
+            if let Some(mv) = cpy.find_move(rem) {
+                writeln!(w, "{:?}", mv)?;
+                state.make_move(mv);
             } else {
                 writeln!(w, "no match")?;
             }

@@ -3,7 +3,8 @@ mod eval;
 mod rules;
 mod structs;
 
-pub use board::*;
-pub use eval::*;
-pub use rules::*;
+use board::*;
+use eval::*;
+
+pub use board::State;
 pub use structs::*;
