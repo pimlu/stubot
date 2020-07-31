@@ -1,17 +1,31 @@
-use std::io::{self, BufRead, Error};
+use std::sync::mpsc;
 
-// want to deploy this elsewhere eventually, so streams are generic
-pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Error> {
-    let w = &mut stdout;
-    let mut stdin = io::BufReader::new(stdin_);
-    let mut line_buf = String::new();
+pub enum LoopMsg {
+    Input(String),
+    Output(String),
+}
 
-    // state associated with the IO thread.
-    let mut state: chess::State = Default::default();
+pub struct UciState {
+    position: chess::State,
+}
 
-    while stdin.read_line(&mut line_buf).unwrap() > 0 {
+impl UciState {
+    pub fn new() -> Self {
+        UciState {
+            position: chess::State::default(),
+        }
+    }
+}
+
+impl UciState {
+    pub fn queue(&mut self, buf: String, tx: mpsc::Sender<LoopMsg>) {
+        macro_rules! send {
+            ($($arg:tt)*) => {
+                tx.send(LoopMsg::Output(format!($($arg)*))).unwrap()
+            }
+        }
         // remaining data not consumed by the command process
-        let mut rem = line_buf.trim();
+        let mut rem = buf.as_str().trim();
         // kinda like strip_prefix if it was stable
         let mut cmd = |name: &str| {
             if rem.starts_with(name) {
@@ -22,22 +36,22 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
         };
         let parse_n = |n, def| str::parse(n).unwrap_or(def);
         if cmd("uci") {
-            writeln!(w, "id name stubot {}", env!("CARGO_PKG_VERSION"))?;
-            writeln!(w, "id author Stuart Geipel")?;
-            writeln!(w, "uciok")?;
+            send!("id name stubot {}", env!("CARGO_PKG_VERSION"));
+            send!("id author Stuart Geipel");
+            send!("uciok");
         } else if cmd("debug") {
             // nothing for now
         } else if cmd("isready") {
-            writeln!(w, "readyok")?;
+            send!("readyok");
         } else if cmd("setoption name") {
             // nothing for now
         } else if cmd("register") {
             // nothing for now
         } else if cmd("ucinewgame") {
-            state = Default::default();
+            self.position = Default::default();
         } else if cmd("position") {
             let parts: Vec<_> = rem.split(" moves ").collect();
-            state = match parts[0] {
+            self.position = match parts[0] {
                 "startpos" => Default::default(),
                 s => {
                     assert!(s.starts_with("fen "));
@@ -45,7 +59,7 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
                 }
             };
             if let Some(moves) = parts.get(1) {
-                state.run_moves(moves.split(" "));
+                self.position.run_moves(moves.split(" "));
             }
         } else if cmd("go") {
             // nothing for now
@@ -54,35 +68,30 @@ pub fn uci(stdin_: impl io::Read, mut stdout: impl io::Write) -> Result<(), Erro
         } else if cmd("quit") {
             std::process::exit(0);
         } else if cmd("move") {
-            state.run_moves(rem.split(" "));
+            self.position.run_moves(rem.split(" "));
         } else if cmd("safe_move") {
             // when unmake_move trashes the state, we can't trust movegen much
-            let mut cpy = state.clone();
+            let mut cpy = self.position.clone();
             if let Some(mv) = cpy.find_move(rem) {
-                writeln!(w, "{:?}", mv)?;
-                state.make_move(mv);
+                send!("{:?}", mv);
+                self.position.make_move(mv);
             } else {
-                writeln!(w, "no match")?;
+                send!("no match");
             }
         } else if cmd("unmove") {
             for i in 0..parse_n(rem, 1) {
-                if state.move_len() == 0 {
-                    writeln!(w, "out of moves, unmade {}", i)?;
+                if self.position.move_len() == 0 {
+                    send!("out of moves, unmade {}", i);
                     break;
                 }
-                state.unmake_move();
+                self.position.unmake_move();
             }
         } else if cmd("pprint") {
-            writeln!(w, "{}", state.board_string())?;
+            send!("{}", self.position.board_string());
         } else if cmd("perft") {
-            writeln!(w, "{}", state.perftree(parse_n(rem, 1)))?;
+            send!("{}", self.position.perftree(parse_n(rem, 1)));
         } else {
-            writeln!(w, "Unknown command: {}", rem)?;
+            send!("Unknown command: {}", rem);
         }
-        w.flush().unwrap();
-        // read_line appends, clear buffer
-        line_buf = String::new();
     }
-
-    Ok(())
 }

@@ -1,11 +1,13 @@
 [workspace]
 members = [
     "stubot-chess",
+    "stubot-engine",
     "stubot-perftree",
     "stubot-uci"
 ]
 default-members = [
     "stubot-chess",
+    "stubot-engine",
     "stubot-uci"
 ]
 
