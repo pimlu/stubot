@@ -1,9 +1,9 @@
 use super::card;
 use super::*;
 
-use std::cmp;
-
 use derive_more::{Add, AddAssign};
+
+use std::cmp;
 
 fn pawn_dir(clr: Color) -> Pos {
     match clr {
@@ -57,15 +57,15 @@ const ROOK_OPTS: &[Pos] = &[
 
 #[derive(Debug, Copy, Clone, PartialEq, Default, Add, AddAssign)]
 pub struct Perft {
-    pub nodes: u64,
-    pub caps: u64,
-    pub enps: u64,
-    pub castles: u64,
-    pub promotions: u64,
+    pub nodes: u128,
+    pub caps: u128,
+    pub enps: u128,
+    pub castles: u128,
+    pub promotions: u128,
 }
 
 impl State {
-    fn in_check(&self, clr: Color) -> bool {
+    pub fn in_check(&self, clr: Color) -> bool {
         let king_pos = *self.get_king_pos(clr);
         debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
         self.is_attacked(king_pos, clr.other())
@@ -148,16 +148,22 @@ impl State {
         }
         return false;
     }
-    // check if the previous psuedo move we made is actually legal.
+
     pub fn is_legal(&self) -> bool {
         !self.in_check(self.turn().other())
     }
+
     pub fn is_legal_move(&mut self, mv: Move) -> bool {
         self.make_move(mv);
         // only extra condition for a psuedo move is check
         let legal = self.is_legal();
         self.unmake_move();
         legal
+    }
+
+    // average number of chess moves for Vec::with_capacity
+    pub fn move_count(&self) -> usize {
+        32
     }
 
     // requires a mutable reference, but doesn't actually modify anything
@@ -169,7 +175,7 @@ impl State {
     }
 
     pub fn gen_sudo_moves(&self) -> Vec<Move> {
-        let mut moves = Vec::with_capacity(32);
+        let mut moves = Vec::with_capacity(self.move_count());
         self.add_sudo_moves(&mut |mv| moves.push(mv));
         moves
     }
@@ -345,7 +351,7 @@ impl State {
     }
 
     pub fn perftree(&mut self, depth: u32) -> String {
-        let mut sum: u64 = 0;
+        let mut sum: u128 = 0;
         let mut moves: Vec<_> = self
             .gen_moves()
             .iter()
@@ -415,7 +421,7 @@ mod test {
         assert!(test_move(Some(KIWIPETE), "e2a6 b4b3 a6c8 e8c8").is_none());
     }
 
-    fn test_position(state: &mut State, nodes: Vec<u64>) {
+    fn test_position(state: &mut State, nodes: Vec<u128>) {
         use pretty_assertions::assert_eq;
         for (d, &n) in nodes.iter().enumerate() {
             let count = state.perft((d + 1) as u32).nodes;

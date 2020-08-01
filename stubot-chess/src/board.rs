@@ -106,10 +106,14 @@ impl State {
     pub fn move_len(&self) -> usize {
         self.moves.len()
     }
+
     pub fn fast_score(&self) -> i16 {
         self.fast_eval.score()
     }
-    // in-place make move, returns capture if it ended up taking one.
+    pub fn slow_score(&self) -> i16 {
+        self.fast_eval.score()
+    }
+    // in-place make move.
     // only performs basic sanity checks. this simply writes the result
     // of movegen to the board
     pub fn make_move(&mut self, mut mv: Move) {

@@ -479,6 +479,9 @@ dependencies = [
 [[package]]
 name = "stubot-engine"
 version = "0.1.0"
+dependencies = [
+ "stubot-chess",
+]
 
 [[package]]
 name = "stubot-perftree"
@@ -493,6 +496,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "stubot-chess",
+ "stubot-engine",
  "tokio",
  "tokio-util",
 ]

@@ -1,29 +1,75 @@
-use std::sync::mpsc;
+use engine::{EngineMsg, UciInfo};
 
-pub enum LoopMsg {
-    Input(String),
-    Output(String),
-}
+use tokio::task;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
+use std::sync::Arc;
 
 pub struct UciState {
+    stop: Arc<AtomicBool>,
+    job: Option<task::JoinHandle<()>>,
     position: chess::State,
+    tx: mpsc::Sender<EngineMsg>,
 }
 
 impl UciState {
-    pub fn new() -> Self {
+    pub fn new(tx: mpsc::Sender<EngineMsg>) -> Self {
         UciState {
+            stop: Arc::new(AtomicBool::new(false)),
+            job: None,
             position: chess::State::default(),
+            tx,
         }
     }
 }
 
 impl UciState {
-    pub fn queue(&mut self, buf: String, tx: mpsc::Sender<LoopMsg>) {
+    pub async fn handle_msg(&mut self, msg: EngineMsg) {
         macro_rules! send {
             ($($arg:tt)*) => {
-                tx.send(LoopMsg::Output(format!($($arg)*))).unwrap()
+                self.tx.send(EngineMsg::Output(format!($($arg)*))).unwrap()
             }
         }
+        macro_rules! stop_job {
+            () => {
+                self.stop.store(true, Ordering::Relaxed);
+                if let Some(job) = &mut self.job {
+                    job.await.unwrap();
+                }
+            };
+        }
+
+        let buf = match msg {
+            EngineMsg::Input(s) => s,
+            EngineMsg::Output(_) => panic!(),
+            EngineMsg::Info(info) => {
+                let UciInfo {
+                    depth,
+                    score,
+                    nodes,
+                    nps,
+                    time,
+                    pv,
+                } = info;
+                let pv_str: Vec<String> = pv.iter().map(|mv| mv.to_string()).collect();
+                send!(
+                    "info depth {} score cp {} nodes {} nps {} time {} pv {}",
+                    depth,
+                    score,
+                    nodes,
+                    nps,
+                    time,
+                    pv_str[..].join(" ")
+                );
+                return;
+            }
+            EngineMsg::BestMove(mv) => {
+                send!("bestmove {}", mv);
+                return;
+            }
+        };
+
         // remaining data not consumed by the command process
         let mut rem = buf.as_str().trim();
         // kinda like strip_prefix if it was stable
@@ -62,9 +108,18 @@ impl UciState {
                 self.position.run_moves(moves.split(" "));
             }
         } else if cmd("go") {
-            // nothing for now
+            self.stop.store(false, Ordering::Relaxed);
+            let pos = self.position.clone();
+            let mut searcher = engine::Searcher {
+                stop: self.stop.clone(),
+                nodes: 0,
+                tx: self.tx.clone(),
+            };
+            self.job = Some(tokio::task::spawn_blocking(move || {
+                searcher.uci_negamax(pos, 5);
+            }));
         } else if cmd("stop") {
-            // nothing for now
+            stop_job!();
         } else if cmd("quit") {
             std::process::exit(0);
         } else if cmd("move") {

@@ -28,6 +28,12 @@ impl Color {
             Color::Black => Color::White,
         }
     }
+    pub fn score(&self, score: i16) -> i16 {
+        match self {
+            Color::White => score,
+            Color::Black => -score,
+        }
+    }
 }
 #[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
 pub enum Type {

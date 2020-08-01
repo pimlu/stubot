@@ -1,5 +1,5 @@
-mod search;
-mod traits;
+mod searcher;
+mod structs;
 
-pub use search::*;
-pub use traits::*;
+pub use searcher::*;
+pub use structs::*;
