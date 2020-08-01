@@ -110,8 +110,19 @@ impl State {
     pub fn fast_score(&self) -> i16 {
         self.fast_eval.score()
     }
-    pub fn slow_score(&self) -> i16 {
-        self.fast_eval.score()
+    pub fn slow_score(&mut self) -> i16 {
+        let moves = self.gen_sudo_moves();
+        for mv in moves {
+            if self.is_legal_move(mv) {
+                return self.fast_score();
+            }
+        }
+        // we have no legal moves.
+        if self.in_check(self.turn()) {
+            self.turn().score(CHECKMATE)
+        } else {
+            DRAW
+        }
     }
     // in-place make move.
     // only performs basic sanity checks. this simply writes the result
@@ -252,7 +263,7 @@ impl State {
 // String processing stuff
 
 // maps an iterator and joins it on delim
-fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
+pub fn show_iter<I, J>(show: impl Fn(J) -> String, delim: &str, row: I) -> String
 where
     I: IntoIterator<Item = J>,
 {

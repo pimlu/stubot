@@ -1,4 +1,4 @@
-use engine::{EngineMsg, UciInfo};
+use engine::{EngineMsg, Searcher, UciInfo};
 
 use tokio::task;
 
@@ -52,7 +52,6 @@ impl UciState {
                     time,
                     pv,
                 } = info;
-                let pv_str: Vec<String> = pv.iter().map(|mv| mv.to_string()).collect();
                 send!(
                     "info depth {} score cp {} nodes {} nps {} time {} pv {}",
                     depth,
@@ -60,7 +59,7 @@ impl UciState {
                     nodes,
                     nps,
                     time,
-                    pv_str[..].join(" ")
+                    chess::show_iter(|mv| mv.to_string(), " ", pv)
                 );
                 return;
             }
@@ -110,11 +109,7 @@ impl UciState {
         } else if cmd("go") {
             self.stop.store(false, Ordering::Relaxed);
             let pos = self.position.clone();
-            let mut searcher = engine::Searcher {
-                stop: self.stop.clone(),
-                nodes: 0,
-                tx: self.tx.clone(),
-            };
+            let mut searcher = Searcher::new(self.stop.clone(), self.tx.clone());
             self.job = Some(tokio::task::spawn_blocking(move || {
                 searcher.uci_negamax(pos, 5);
             }));

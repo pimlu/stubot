@@ -69,6 +69,8 @@ const KING_TBL: ScoreTable = [
     [-30, -40, -40, -50, -50, -40, -40, -30],
 ];
 
+pub const CHECKMATE: i16 = 20000;
+pub const DRAW: i16 = 0;
 const TYP_VALS: &[i16] = &[100, 320, 330, 500, 900, 0];
 
 #[derive(Debug, Copy, Clone, PartialEq)]
