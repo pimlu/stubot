@@ -14,6 +14,8 @@ fn pawn_dir(clr: Color) -> Pos {
 // no trait aliases yet
 trait PosCb: FnMut(Pos) -> bool {}
 impl<T: FnMut(Pos) -> bool> PosCb for T {}
+pub trait MoveAdd: FnMut(Move) {}
+impl<T: FnMut(Move)> MoveAdd for T {}
 
 fn rider(orig: Pos, options: &'static [Pos], mut f: impl PosCb) {
     for &dir in options {
@@ -121,7 +123,7 @@ impl State {
     // return value is unused in some cases.
     // except if gate(Sq) is false, it just stops early. gate is unused (just
     // returns true) in some cases.
-    fn try_move(&self, gate: impl Fn(bool) -> bool, moves: &mut Vec<Move>, mut mv: Move) -> bool {
+    fn try_move(&self, gate: impl Fn(bool) -> bool, add: &mut impl MoveAdd, mut mv: Move) -> bool {
         if mv.extra == Some(MvExtra::EnPassant) {
             mv.capture = Some(Type::Pawn);
         }
@@ -136,36 +138,43 @@ impl State {
         let Piece { clr, typ } = match b_sq {
             Sq(Some(pc)) => pc,
             Sq(None) => {
-                moves.push(mv);
+                add(mv);
                 return true;
             }
         };
         if clr != self.turn() {
             mv.capture = Some(typ);
-            moves.push(mv);
+            add(mv);
         }
         return false;
     }
-    pub fn is_legal(&mut self, mv: Move) -> bool {
+    // check if the previous psuedo move we made is actually legal.
+    pub fn is_legal(&self) -> bool {
+        !self.in_check(self.turn().other())
+    }
+    pub fn is_legal_move(&mut self, mv: Move) -> bool {
         self.make_move(mv);
         // only extra condition for a psuedo move is check
-        let legal = !self.in_check(self.turn().other());
+        let legal = self.is_legal();
         self.unmake_move();
         legal
     }
 
+    // requires a mutable reference, but doesn't actually modify anything
+    // (if our code is correct)
     pub fn gen_moves(&mut self) -> Vec<Move> {
-        let mut moves = Vec::new();
-        self.gen_sudo_moves(&mut moves);
-        moves.retain(|&mv| self.is_legal(mv));
+        let mut moves = self.gen_sudo_moves();
+        moves.retain(|&mv| self.is_legal_move(mv));
         moves
     }
 
-    // requires a mutable reference, but doesn't actually modify anything
-    // (if our code is correct)
-    pub fn gen_sudo_moves(&self, moves: &mut Vec<Move>) {
-        moves.clear();
+    pub fn gen_sudo_moves(&self) -> Vec<Move> {
+        let mut moves = Vec::with_capacity(32);
+        self.add_sudo_moves(&mut |mv| moves.push(mv));
+        moves
+    }
 
+    pub fn add_sudo_moves(&self, add: &mut impl MoveAdd) {
         let enp = self.get_extra().enp;
         let mut add_moves = |orig| {
             let Piece { clr, typ } = match self.get(orig).unwrap() {
@@ -177,7 +186,7 @@ impl State {
                     |pos| {
                         self.try_move(
                             $gate,
-                            moves,
+                            add,
                             Move {
                                 a: orig,
                                 b: pos,
@@ -290,24 +299,17 @@ impl State {
         }
     }
     pub fn perft(&mut self, depth: u32) -> Perft {
-        self.perft_(depth, &mut vec![vec![]; depth as usize][..])
-    }
-    pub fn perft_(&mut self, depth: u32, stack: &mut [Vec<Move>]) -> Perft {
         let mut res: Perft = Default::default();
         if depth == 0 {
             res.nodes = 1;
             return res;
         }
 
-        let (moves, rest) = stack.split_first_mut().unwrap();
-
-        self.gen_sudo_moves(moves);
-
-        for mv in moves {
+        for mv in self.gen_sudo_moves() {
             #[cfg(test)]
             let mut cpy = self.clone();
-            self.make_move(*mv);
-            if !self.in_check(self.turn().other()) {
+            self.make_move(mv);
+            if self.is_legal() {
                 if depth == 1 {
                     res.nodes += 1;
                     match mv.extra {
@@ -320,7 +322,7 @@ impl State {
                         res.caps += 1;
                     }
                 } else {
-                    res += self.perft_(depth - 1, rest);
+                    res += self.perft(depth - 1);
                 }
             }
             self.unmake_move();
@@ -332,7 +334,7 @@ impl State {
                 println!("{}", cpy.board_string());
                 println!("then move {}:", mv);
                 println!("{:?}", mv);
-                cpy.make_move(*mv);
+                cpy.make_move(mv);
                 println!("{}", cpy.board_string());
                 println!("unmade into:");
                 println!("{}", self.board_string());
@@ -344,13 +346,12 @@ impl State {
 
     pub fn perftree(&mut self, depth: u32) -> String {
         let mut sum: u64 = 0;
-        let mut stack = vec![vec![]; depth as usize];
         let mut moves: Vec<_> = self
             .gen_moves()
             .iter()
             .map(|&mv| {
                 self.make_move(mv);
-                let nodes = self.perft_(depth - 1, &mut stack[..]).nodes;
+                let nodes = self.perft(depth - 1).nodes;
                 self.unmake_move();
 
                 sum += nodes;
