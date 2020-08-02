@@ -107,6 +107,9 @@ impl State {
         self.moves.len()
     }
 
+    pub fn rel_neg(&self, score: i16) -> i16 {
+        self.turn().rel_neg(score)
+    }
     pub fn fast_score(&self) -> i16 {
         self.fast_eval.score()
     }
@@ -118,8 +121,11 @@ impl State {
             }
         }
         // we have no legal moves.
+        self.end_score()
+    }
+    pub fn end_score(&self) -> i16 {
         if self.in_check(self.turn()) {
-            self.turn().score(-CHECKMATE)
+            self.rel_neg(-CHECKMATE)
         } else {
             DRAW
         }

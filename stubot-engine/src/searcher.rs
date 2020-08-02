@@ -1,6 +1,6 @@
 use super::*;
 
-use chess::{Move, State};
+use chess::{Move, State, MATE_BOUND};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -13,6 +13,17 @@ pub struct Searcher {
     pub tx: mpsc::Sender<EngineMsg>,
     // misses checkmates at depth 0, but way faster
     pub negamax_hack: bool,
+}
+
+// negate for negamax, increment checkmate ply counter
+fn tick_score(enemy_score: i16) -> i16 {
+    let score = -enemy_score;
+    if enemy_score.abs() >= MATE_BOUND {
+        // decrement towards 0
+        score - if score > 0 { 1 } else { -1 }
+    } else {
+        score
+    }
 }
 
 impl Searcher {
@@ -51,19 +62,14 @@ impl Searcher {
         self.tx.send(EngineMsg::BestMove(best_mv.unwrap())).unwrap();
     }
     fn negamax(&mut self, state: &mut State, depth: u32) -> (Option<Move>, i16) {
-        let (mv, rel_score) = self.negamax_(state, depth);
-        (mv, state.turn().score(rel_score))
-    }
-    //returns relative score
-    fn negamax_(&mut self, state: &mut State, depth: u32) -> (Option<Move>, i16) {
         self.nodes += 1;
         if depth == 0 || self.stop.load(Ordering::Relaxed) {
-            let score = if self.negamax_hack {
+            let abs_score = if self.negamax_hack {
                 state.fast_score()
             } else {
                 state.slow_score()
             };
-            return (None, state.turn().score(score));
+            return (None, state.rel_neg(abs_score));
         }
         let mut moves = Vec::with_capacity(state.move_count());
         state.add_sudo_moves(&mut |mv| moves.push(mv));
@@ -72,15 +78,19 @@ impl Searcher {
         for mv in moves {
             state.make_move(mv);
             if state.is_legal() {
-                let score = Some(-self.negamax_(state, depth - 1).1);
-                if score > best_score {
-                    best_score = score;
+                let enemy_score = self.negamax(state, depth - 1).1;
+                let our_score = Some(tick_score(enemy_score));
+                if our_score > best_score {
+                    best_score = our_score;
                     best_move = Some(mv);
                 }
             }
             state.unmake_move();
         }
-        let calc_mate = || state.turn().score(state.slow_score());
+        let calc_mate = || {
+            let abs_score = state.end_score();
+            state.rel_neg(abs_score)
+        };
         (best_move, best_score.unwrap_or_else(calc_mate))
     }
 }
@@ -89,6 +99,7 @@ impl Searcher {
 mod test {
     use super::*;
     const HORIZON_QUEEN: &str = "r1bk1b1r/ppppqppp/5n2/4B3/8/2N5/PPP1QPPP/R3KBNR w KQ - 3 9";
+    const MATE_2_B: &str = "6k1/ppp5/8/4K1p1/b4r2/8/3r4/8 b - - 7 39";
     const ROOK_MATE_W: &str = "5k2/8/5K1R/8/8/8/8/8 w - - 0 1";
     const ROOK_MATE_B: &str = "8/8/8/8/7p/5k1r/8/5K2 b - - 0 1";
 
@@ -124,17 +135,21 @@ mod test {
     fn horizon_queen() {
         assert_eq!(get_pv(HORIZON_QUEEN, 5), "c3d5 f6d5 e5c7 d8c7 e2e7");
     }
+    #[test]
+    fn mate_in_2() {
+        assert_eq!(get_pv(MATE_2_B, 4), "a4c6 e5e6 d2e2");
+    }
     // mate in one, score check
     #[test]
     fn rook_mate_as_white() {
         let (mv, sc) = do_search(ROOK_MATE_W, 3);
-        assert_eq!(sc, chess::CHECKMATE);
+        assert_eq!(sc, chess::mate_ply(1));
         assert_eq!(mv.unwrap().to_string(), "h6h8");
     }
     #[test]
     fn rook_mate_as_black() {
         let (mv, sc) = do_search(ROOK_MATE_B, 2);
-        assert_eq!(sc, -chess::CHECKMATE);
+        assert_eq!(sc, chess::mate_ply(1));
         assert_eq!(mv.unwrap().to_string(), "h3h1");
     }
 }

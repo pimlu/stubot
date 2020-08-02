@@ -1,4 +1,4 @@
-use engine::{EngineMsg, Searcher, UciInfo};
+use engine::{EngineMsg, Searcher};
 
 use tokio::task;
 
@@ -44,28 +44,10 @@ impl UciState {
             EngineMsg::Input(s) => s,
             EngineMsg::Output(_) => panic!(),
             EngineMsg::Info(info) => {
-                let UciInfo {
-                    depth,
-                    score,
-                    nodes,
-                    nps,
-                    time,
-                    pv,
-                } = info;
-                send!(
-                    "info depth {} score cp {} nodes {} nps {} time {} pv {}",
-                    depth,
-                    score,
-                    nodes,
-                    nps,
-                    time,
-                    chess::show_iter(|mv| mv.to_string(), " ", pv)
-                );
-                return;
+                return send!("info {}", info);
             }
             EngineMsg::BestMove(mv) => {
-                send!("bestmove {}", mv);
-                return;
+                return send!("bestmove {}", mv);
             }
         };
 

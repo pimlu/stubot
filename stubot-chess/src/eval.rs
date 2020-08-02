@@ -69,8 +69,13 @@ const KING_TBL: ScoreTable = [
     [-30, -40, -40, -50, -50, -40, -40, -30],
 ];
 
+// asssumption: [CHECKMATE - 255..=CHECKMATE] are mate-in-x-ply
 pub const CHECKMATE: i16 = 20000;
+pub const MATE_BOUND: i16 = CHECKMATE - u8::MAX as i16;
 pub const DRAW: i16 = 0;
+pub fn mate_ply(ply: u8) -> i16 {
+    CHECKMATE - ply as i16
+}
 const TYP_VALS: &[i16] = &[100, 320, 330, 500, 900, 0];
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -124,5 +129,16 @@ impl FastEval {
     }
     pub fn score(&self) -> i16 {
         return self.score + self.king_early;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // just make sure our value of checkmate isn't too low for constructed positions
+    #[test]
+    fn checkmate_value() {
+        assert!(CHECKMATE / TYP_VALS[Type::Queen as usize] >= 16);
     }
 }
