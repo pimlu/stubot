@@ -119,7 +119,7 @@ impl State {
         }
         // we have no legal moves.
         if self.in_check(self.turn()) {
-            self.turn().score(CHECKMATE)
+            self.turn().score(-CHECKMATE)
         } else {
             DRAW
         }

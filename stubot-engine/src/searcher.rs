@@ -51,6 +51,11 @@ impl Searcher {
         self.tx.send(EngineMsg::BestMove(best_mv.unwrap())).unwrap();
     }
     fn negamax(&mut self, state: &mut State, depth: u32) -> (Option<Move>, i16) {
+        let (mv, rel_score) = self.negamax_(state, depth);
+        (mv, state.turn().score(rel_score))
+    }
+    //returns relative score
+    fn negamax_(&mut self, state: &mut State, depth: u32) -> (Option<Move>, i16) {
         self.nodes += 1;
         if depth == 0 || self.stop.load(Ordering::Relaxed) {
             let score = if self.negamax_hack {
@@ -67,7 +72,7 @@ impl Searcher {
         for mv in moves {
             state.make_move(mv);
             if state.is_legal() {
-                let score = Some(-self.negamax(state, depth - 1).1);
+                let score = Some(-self.negamax_(state, depth - 1).1);
                 if score > best_score {
                     best_score = score;
                     best_move = Some(mv);
@@ -75,7 +80,8 @@ impl Searcher {
             }
             state.unmake_move();
         }
-        (best_move, best_score.unwrap_or_else(|| state.slow_score()))
+        let calc_mate = || state.turn().score(state.slow_score());
+        (best_move, best_score.unwrap_or_else(calc_mate))
     }
 }
 
@@ -83,7 +89,8 @@ impl Searcher {
 mod test {
     use super::*;
     const HORIZON_QUEEN: &str = "r1bk1b1r/ppppqppp/5n2/4B3/8/2N5/PPP1QPPP/R3KBNR w KQ - 3 9";
-    const ROOK_MATE: &str = "5k2/8/5K1R/8/8/8/8/8 w - - 0 1";
+    const ROOK_MATE_W: &str = "5k2/8/5K1R/8/8/8/8/8 w - - 0 1";
+    const ROOK_MATE_B: &str = "8/8/8/8/7p/5k1r/8/5K2 b - - 0 1";
 
     fn searcher() -> Searcher {
         let (tx, _) = mpsc::channel::<EngineMsg>();
@@ -98,10 +105,17 @@ mod test {
             for &mv in &pv {
                 state.make_move(mv);
             }
-            let (mv, _sc) = search.negamax(&mut state, depth - i);
-            pv.push(mv.unwrap());
+            let (best_mv, _sc) = search.negamax(&mut state, depth - i);
+            if let Some(mv) = best_mv {
+                pv.push(mv);
+            }
         }
         format!("{}", chess::show_iter(|mv| mv.to_string(), " ", pv))
+    }
+    fn do_search(fen: &str, depth: u32) -> (Option<Move>, i16) {
+        let mut search = searcher();
+        let mut pos: State = str::parse(fen).unwrap();
+        search.negamax(&mut pos, depth)
     }
 
     #[test]
@@ -112,11 +126,15 @@ mod test {
     }
     // mate in one, score check
     #[test]
-    fn rook_mate() {
-        let mut search = searcher();
-        let mut pos: State = str::parse(ROOK_MATE).unwrap();
-        let (mv, sc) = search.negamax(&mut pos, 3);
+    fn rook_mate_as_white() {
+        let (mv, sc) = do_search(ROOK_MATE_W, 3);
         assert_eq!(sc, chess::CHECKMATE);
         assert_eq!(mv.unwrap().to_string(), "h6h8");
+    }
+    #[test]
+    fn rook_mate_as_black() {
+        let (mv, sc) = do_search(ROOK_MATE_B, 2);
+        assert_eq!(sc, -chess::CHECKMATE);
+        assert_eq!(mv.unwrap().to_string(), "h3h1");
     }
 }
