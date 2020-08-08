@@ -59,6 +59,7 @@ impl State {
         debug_assert!(*self.idx(king_pos) == Sq::new(clr, Type::King));
         self.is_attacked(king_pos, clr.other())
     }
+    // extends out rays/leaps in reverse to see if someone attacks
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
         use std::cell::Cell;
         let enemy_knight = Sq::new(enemy, Type::Knight);
@@ -108,7 +109,7 @@ impl State {
 
         found_attack.get()
     }
-    // pushes the move if there is space, returns whether ray should continue.
+    // adds the move if there is space, returns whether ray should continue.
     // return value is unused in some cases.
     // except if gate(Sq) is false, it just stops early. gate is unused (just
     // returns true) in some cases.
@@ -176,6 +177,11 @@ impl State {
                 Sq(Some(pc)) => *pc,
                 Sq(None) => return,
             };
+            if clr != self.turn() {
+                return;
+            }
+
+            // constructs a helper closure to add a move going from orig -> pos
             macro_rules! try_move {
                 ($gate: expr, $extra: expr) => {
                     |pos| {
@@ -194,6 +200,7 @@ impl State {
             }
             macro_rules! pawn_move {
                 ($pos:expr, $is_take:expr) => {
+                    // last row is a promotion move
                     if orig.y == rel_y(clr.other(), 1) {
                         for &typ in &[Type::Knight, Type::Bishop, Type::Rook, Type::Queen] {
                             try_move!(|take| take == $is_take, Some(MvExtra::Promote(typ)))($pos);
@@ -208,15 +215,9 @@ impl State {
                 () => {
                     try_move!(|_| true, None)
                 };
-                ($pos: expr) => {
-                    add_move!()($pos)
-                };
                 ($pos: expr, $extra: expr) => {
                     try_move!(|_| true, $extra)($pos)
                 };
-            }
-            if clr != self.turn() {
-                return;
             }
 
             match typ {
