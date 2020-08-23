@@ -93,7 +93,7 @@ impl UciState {
             let pos = self.position.clone();
             let mut searcher = Searcher::new(self.stop.clone(), self.tx.clone());
             self.job = Some(tokio::task::spawn_blocking(move || {
-                searcher.uci_negamax(pos, 5);
+                searcher.uci_negamax(pos, 7);
             }));
         } else if cmd("stop") {
             stop_job!();

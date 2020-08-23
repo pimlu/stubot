@@ -2,6 +2,8 @@ use super::*;
 
 use chess::{Move, State, MATE_BOUND};
 
+use std::cmp;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -13,6 +15,29 @@ pub struct Searcher {
     pub tx: mpsc::Sender<EngineMsg>,
     // misses checkmates at depth 0, but way faster
     pub negamax_hack: bool,
+}
+
+pub struct SearchParams {
+    depth: u32,
+    alpha: i16,
+    beta: i16,
+}
+
+impl SearchParams {
+    fn new(depth: u32) -> Self {
+        SearchParams {
+            depth,
+            alpha: -i16::MAX,
+            beta: i16::MAX,
+        }
+    }
+    fn tick(&self) -> Self {
+        SearchParams {
+            depth: self.depth - 1,
+            alpha: -self.beta,
+            beta: -self.alpha,
+        }
+    }
 }
 
 // negate for negamax, increment checkmate ply counter
@@ -41,7 +66,7 @@ impl Searcher {
 
         let mut best_mv = None;
         for d in 1..=depth {
-            let (mv, score) = self.negamax(&mut state, d);
+            let (mv, score) = self.negamax(&mut state, SearchParams::new(d));
             if self.stop.load(Ordering::Relaxed) {
                 break;
             }
@@ -61,9 +86,9 @@ impl Searcher {
         }
         self.tx.send(EngineMsg::BestMove(best_mv.unwrap())).unwrap();
     }
-    fn negamax(&mut self, state: &mut State, depth: u32) -> (Option<Move>, i16) {
+    fn negamax(&mut self, state: &mut State, mut params: SearchParams) -> (Option<Move>, i16) {
         self.nodes += 1;
-        if depth == 0 || self.stop.load(Ordering::Relaxed) {
+        if params.depth == 0 || self.stop.load(Ordering::Relaxed) {
             let abs_score = if self.negamax_hack {
                 state.fast_score()
             } else {
@@ -72,20 +97,36 @@ impl Searcher {
             return (None, state.rel_neg(abs_score));
         }
         let mut moves = Vec::with_capacity(state.move_count());
-        state.add_sudo_moves(&mut |mv| moves.push(mv));
+        state.add_sudo_moves(&mut |mv| moves.push((mv, 0)));
+
+        // try best moves first by a shallow estimation
+        for (mv, our_score) in &mut moves {
+            state.make_move(*mv);
+            *our_score = state.rel_neg(state.fast_score());
+            state.unmake_move();
+        }
+        moves.sort_by_key(|&(_, sc)| sc);
+
         let mut best_move = None;
         let mut best_score = None;
-        for mv in moves {
+        for (mv, _) in moves {
             state.make_move(mv);
             if state.is_legal() {
-                let enemy_score = self.negamax(state, depth - 1).1;
+                // if the move is legal, check if we can raise alpha
+                let enemy_score = self.negamax(state, params.tick()).1;
                 let our_score = Some(tick_score(enemy_score));
+                params.alpha = cmp::max(params.alpha, our_score.unwrap());
                 if our_score > best_score {
                     best_score = our_score;
                     best_move = Some(mv);
                 }
             }
             state.unmake_move();
+            // if the window closed, stop searching - this never triggers
+            // calc_mate because we assume beta > alpha initially
+            if params.beta <= params.alpha {
+                break;
+            }
         }
         let calc_mate = || {
             let abs_score = state.end_score();
@@ -116,7 +157,7 @@ mod test {
             for &mv in &pv {
                 state.make_move(mv);
             }
-            let (best_mv, _sc) = search.negamax(&mut state, depth - i);
+            let (best_mv, _sc) = search.negamax(&mut state, SearchParams::new(depth - i));
             if let Some(mv) = best_mv {
                 pv.push(mv);
             }
@@ -126,7 +167,7 @@ mod test {
     fn do_search(fen: &str, depth: u32) -> (Option<Move>, i16) {
         let mut search = searcher();
         let mut pos: State = str::parse(fen).unwrap();
-        search.negamax(&mut pos, depth)
+        search.negamax(&mut pos, SearchParams::new(depth))
     }
 
     #[test]
@@ -138,6 +179,8 @@ mod test {
     #[test]
     fn mate_in_2() {
         assert_eq!(get_pv(MATE_2_B, 4), "a4c6 e5e6 d2e2");
+        let (_, sc) = do_search(MATE_2_B, 4);
+        assert_eq!(sc, chess::mate_ply(3));
     }
     // mate in one, score check
     #[test]
