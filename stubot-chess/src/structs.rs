@@ -21,6 +21,20 @@ pub enum Color {
     White = 0,
     Black,
 }
+
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                Color::White => "w",
+                Color::Black => "b",
+            }
+        )
+    }
+}
+
 impl Color {
     pub fn other(&self) -> Self {
         match self {
