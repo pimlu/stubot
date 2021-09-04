@@ -3,7 +3,8 @@ members = [
     "stubot-chess",
     "stubot-engine",
     "stubot-perftree",
-    "stubot-uci"
+    "stubot-uci",
+    "stubot-wasm"
 ]
 default-members = [
     "stubot-chess",
@@ -12,4 +13,5 @@ default-members = [
 ]
 
 [profile.release]
-debug = true
+lto = true
+opt-level = "s"

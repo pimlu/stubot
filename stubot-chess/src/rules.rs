@@ -234,7 +234,7 @@ impl State {
                         let take_pos = orig + dir + side;
                         // needs to be able to "take" the spot they skipped
                         let y_match = orig.y == rel_y(clr.other(), 3);
-                        if enp >= 0 && take_pos.x == enp && y_match {
+                        if enp.map_or(false, |e| take_pos.x == e.x) && y_match {
                             add_move!(take_pos, Some(MvExtra::EnPassant));
                         } else {
                             pawn_move!(take_pos, true);

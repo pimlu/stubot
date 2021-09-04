@@ -24,7 +24,7 @@ pub struct SearchParams {
 }
 
 impl SearchParams {
-    fn new(depth: u32) -> Self {
+    pub fn new(depth: u32) -> Self {
         SearchParams {
             depth,
             alpha: -i16::MAX,
@@ -86,7 +86,7 @@ impl Searcher {
         }
         self.tx.send(EngineMsg::BestMove(best_mv.unwrap())).unwrap();
     }
-    fn negamax(&mut self, state: &mut State, mut params: SearchParams) -> (Option<Move>, i16) {
+    pub fn negamax(&mut self, state: &mut State, mut params: SearchParams) -> (Option<Move>, i16) {
         self.nodes += 1;
         if params.depth == 0 || self.stop.load(Ordering::Relaxed) {
             let abs_score = if self.negamax_hack {

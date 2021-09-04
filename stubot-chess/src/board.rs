@@ -7,7 +7,7 @@ use std::str;
 pub struct StateExtra {
     castle: [[bool; 2]; 2],
     pub capture: Option<Type>,
-    pub enp: i8,
+    pub enp: Option<Pos>,
 }
 
 impl StateExtra {
@@ -15,7 +15,7 @@ impl StateExtra {
         StateExtra {
             castle: [[false; 2]; 2],
             capture: None,
-            enp: -1,
+            enp: None,
         }
     }
     pub fn get_castle(&self, clr: Color, side: CastleSide) -> &bool {
@@ -29,6 +29,7 @@ impl StateExtra {
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {
     ply: u32,
+    ply_clock: u32,
     board: [[Sq; BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
     king_pos: [Pos; 2],
     cur_extra: StateExtra,
@@ -168,13 +169,13 @@ impl State {
             None => (),
         }
         let mut st_extra = self.cur_extra;
-        st_extra.enp = -1;
+        st_extra.enp = None;
         match a_pc.typ {
             Type::Pawn =>
             // prep for en passant next move
             {
                 if (mv.b.y - mv.a.y).abs() == 2 {
-                    st_extra.enp = mv.a.x;
+                    st_extra.enp = Some(mv.b);
                 }
             }
             Type::King => {
@@ -256,6 +257,7 @@ impl State {
     pub fn zero_board() -> Self {
         State {
             ply: 0,
+            ply_clock: 0,
             board: [[Sq(None); BOARD_DIM.x as usize]; BOARD_DIM.y as usize],
             king_pos: [Pos { x: 0, y: 0 }, Pos { x: 0, y: 0 }],
             cur_extra: StateExtra::zero_init(),
@@ -281,9 +283,67 @@ impl State {
         show_iter(show_row, "\n", self.board.iter().rev())
     }
 }
+// output fen format
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", "fen")
+        let pos = show_iter(
+            |row| {
+                let mut count: u8 = 0;
+                let mut s = String::new();
+                let dump = |count: &mut u8| {
+                    let d = ('0' as u8 + *count) as char;
+                    *count = 0;
+                    if d == '0' {
+                        String::new()
+                    } else {
+                        d.to_string()
+                    }
+                };
+                for sq in row {
+                    s += &match sq.0 {
+                        Some(_) => dump(&mut count) + &sq.to_string(),
+                        None => {
+                            count += 1;
+                            String::new()
+                        }
+                    };
+                }
+                s + &dump(&mut count)
+            },
+            "/",
+            self.board.iter().rev(),
+        );
+        let move_num = 1 + self.ply / 2;
+        let mut castle_rights = String::with_capacity(4);
+        for clr in [Color::White, Color::Black] {
+            for (typ, side) in [
+                (Type::King, CastleSide::Short),
+                (Type::Queen, CastleSide::Long),
+            ] {
+                if *self.get_extra().get_castle(clr, side) {
+                    let pc = format!("{}", Sq::new(clr, typ));
+                    castle_rights += &pc;
+                }
+            }
+        }
+        if castle_rights.is_empty() {
+            castle_rights = "-".to_string();
+        }
+        let enp = self
+            .get_extra()
+            .enp
+            .map_or("-".to_string(), |e| e.to_string());
+
+        write!(
+            f,
+            "{} {} {} {} {} {}",
+            pos,
+            self.turn(),
+            castle_rights,
+            enp,
+            self.ply_clock,
+            move_num
+        )
     }
 }
 
@@ -302,7 +362,7 @@ impl str::FromStr for State {
 
         let mut state = State::zero_board();
         let items = fen.split(" ").collect::<Vec<_>>();
-        if let [board, turn, castle, enp, _half, full] = items.as_slice() {
+        if let [board, turn, castle, enp, half, full] = items.as_slice() {
             let clr_add = match *turn {
                 "w" => 0,
                 "b" => 1,
@@ -311,14 +371,10 @@ impl str::FromStr for State {
             let full_u = conv_err(str::parse::<u32>(full))?;
             // full turns are double, we start at ply 0, not full turn 1
             state.ply = 2 * (full_u - 1) + clr_add;
+            state.ply_clock = conv_err(str::parse::<u32>(half))?;
 
             let mut extra = StateExtra::zero_init();
-            match str::parse::<Pos>(enp) {
-                Ok(pos) => {
-                    extra.enp = pos.x;
-                }
-                _ => (),
-            }
+            extra.enp = str::parse::<Pos>(enp).ok();
             for c in castle.chars() {
                 let (clr, side) = match c {
                     'q' => (Color::Black, CastleSide::Long),
@@ -338,8 +394,7 @@ impl str::FromStr for State {
                 }
                 let mut x: usize = 0;
                 for c in row.chars() {
-                    //TODO larger boards?
-                    if "12345678".contains(c) {
+                    if "123456789".contains(c) {
                         x += c as usize - '0' as usize;
                     } else {
                         if x >= BOARD_DIM.x as usize {
@@ -372,6 +427,8 @@ impl Default for State {
 
 #[cfg(test)]
 mod test {
+    use crate::perft::test::*;
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -388,5 +445,11 @@ p p p p p p p p
 P P P P P P P P
 R N B Q K B N R"
         );
+    }
+    #[test]
+    fn fen_parse_matches() {
+        for fen in [KIWIPETE, POS_3, POS_4, POS_5, POS_6, DUB_M8] {
+            assert_eq!(fen, str::parse::<State>(fen).unwrap().to_string());
+        }
     }
 }
