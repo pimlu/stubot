@@ -1,0 +1,55 @@
+
+.board-wrap {
+  position: relative;
+  max-width: min(max(100vh, 400px), 800px);
+}
+.board {
+  display: grid;
+  user-select: none;
+}
+.board > .sq {
+  position: relative;
+}
+.pc-frame {
+  position: relative;
+  z-index: 1;
+  touch-action: none;
+}
+.sq-inner.cover {
+  background: rgba(98,153,36,0.6);
+}
+.sq-inner.circ {
+  background: radial-gradient(rgba(20,85,30,0.5) 19%, rgba(0,0,0,0) 20%);
+}
+.sq-inner.frame {
+  background: radial-gradient(rgba(0,0,0,0) 79%, rgba(20,85,30,0.5) 80%);
+}
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.board .pc {
+  position: relative;
+  width: 75%;
+  height: 75%;
+}
+.pc svg, .pc svg * {
+  stroke-width: 5%;
+  paint-order: stroke;
+}
+.board .pc .w {
+  color: #fff;
+  stroke: #000;
+}
+.board .pc .b {
+  color: #000;
+  stroke: #fff;
+}
+
+.board .db {
+  background: #b58863;
+}
+.board .lb {
+  background: #f0d9b5;
+}

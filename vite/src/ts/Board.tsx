@@ -6,17 +6,20 @@ import { WasmPos } from "./wasm";
 import { DroppableSquare } from "./Square";
 import { JsPos, JsState } from "./types";
 import { Piece, DraggablePiece } from "./Piece";
+import { splitMv } from "./util";
 
+import './Board.css';
 
 interface BoardProps {
-  state: JsState,
-  move: (a: JsPos, b: JsPos) => void,
-  isWhite?: boolean,
+  state: JsState;
+  mkMove: (a: JsPos, b: JsPos) => void;
+  canMove: boolean;
+  flipped?: boolean;
 }
-export default function Board({state, move, isWhite}: BoardProps) {
+export default function Board({state, mkMove, canMove, flipped}: BoardProps) {
   const {grid, mvMap} = useMemo(() => {
     const grid = state.st.boardString().split('\n').reverse().map(r => r.split(' '));
-    const moves = state.st.moveGen().split(' ').map(([ax, ay, bx, by]) => [ax+ay, bx+by]);
+    const moves = state.st.moveGen().split(' ').map(splitMv);
     const mvMap = moves.reduce((map, [a, b]) => {
       if (!map.get(a)) map.set(a, new Set());
       map.get(a)!.add(b);
@@ -33,7 +36,7 @@ export default function Board({state, move, isWhite}: BoardProps) {
   }
   function onDragEnd(event: DragEndEvent) {
     const over = event.over?.id;
-    if (validDest(over)) move(selected!, over!);
+    if (canMove && validDest(over)) mkMove(selected!, over!);
     onDragCancel();
   }
   useDndMonitor({
@@ -44,11 +47,9 @@ export default function Board({state, move, isWhite}: BoardProps) {
     onDragCancel
   });
 
-
   const ys = [...Array(bh)].map((_,i) => i);
   const xs = [...Array(bw)].map((_,j) => j);
-  if (!isWhite) ys.reverse();
-
+  if (!flipped) ys.reverse();
 
   return (
     <div className="board-wrap css-sq">

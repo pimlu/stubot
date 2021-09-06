@@ -1,19 +1,35 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {WasmState} from './wasm';
 import Board from './Board';
 import { DndContext } from '@dnd-kit/core';
-import { JsPos, JsState } from './types';
+import { GameBot, JsPos, JsState, Phase } from './types';
+import { negamax, splitMv } from './util';
 
-
-export default function Game() {
-  const st = useMemo(() => new JsState(new WasmState()), []);
-  const [state, setState] = useState(st);
-  const flipped = false;
+interface GameProps {
+  setPhase: React.Dispatch<Phase>;
+  bot?: GameBot;
+}
+export default function Game({bot}: GameProps) {
+  const [state, setState] = useState(() => new JsState(new WasmState()));
+  const isWhite = useMemo(() => state.st.isWhite(), [state]);
+  
+  const flipped = bot ? bot.isWhite : !isWhite;
   // look at the declaration of JsState to understand this nonsense
-  const move = useCallback((a: JsPos, b: JsPos) => setState(
+  const mkMove = useCallback((a: JsPos, b: JsPos) => setState(
     state => state.mut(st => st.makeMove(a+b))
   ), [setState]);
+  const canMove = bot ? bot.isWhite !== isWhite : true;
+  useEffect(() => {
+    if (canMove || !bot) return;
+    const {promise, cancel} = negamax({
+      fen: `${state.st}`,
+      depth: bot.depth
+    });
+    promise.then(({mv}) => mkMove(...splitMv(mv)));
+    return cancel;
+  }, [isWhite, bot, canMove]);
+
   return (<DndContext>
-    <Board {...{state, move, flipped}} />
+    <Board {...{state, mkMove, canMove, flipped}} />
   </DndContext>);
 }

@@ -1,4 +1,4 @@
-use chess::Pos;
+use chess::{Color, Pos};
 use chess::{Move, State};
 use engine::{EngineMsg, SearchParams, Searcher};
 
@@ -76,6 +76,10 @@ impl WasmState {
     #[wasm_bindgen(js_name=boardString)]
     pub fn board_string(&self) -> String {
         self.state.board_string()
+    }
+    #[wasm_bindgen(js_name=isWhite)]
+    pub fn is_white(&self) -> bool {
+        self.state.turn() == Color::White
     }
 }
 

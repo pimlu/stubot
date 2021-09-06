@@ -14,4 +14,4 @@ default-members = [
 
 [profile.release]
 lto = true
-opt-level = "s"
+opt-level = 3
