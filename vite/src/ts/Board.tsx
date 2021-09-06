@@ -28,17 +28,20 @@ export default function Board({state, move, isWhite}: BoardProps) {
   const bw = grid.length, bh = grid[0].length;
   const [selected, setSelected] = useState<JsPos>();
   const validDest = (b?: JsPos) => !!selected && !!b && mvMap.get(selected)?.has(b);
+  function onDragCancel() {
+    setSelected(undefined);
+  }
   function onDragEnd(event: DragEndEvent) {
     const over = event.over?.id;
     if (validDest(over)) move(selected!, over!);
-    setSelected(undefined);
+    onDragCancel();
   }
   useDndMonitor({
     onDragStart(event) {
       setSelected(event.active.id);
     },
     onDragEnd,
-    onDragCancel: onDragEnd
+    onDragCancel
   });
 
 

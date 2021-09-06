@@ -29,10 +29,12 @@ export const Piece = React.memo(React.forwardRef<HTMLDivElement, PieceProps>(
     const isWhite = pc === upper;
     const icon = pieceMap[upper];
 
-    return <div className="pc" ref={ref} {...rest}>
-      <FontAwesomeIcon
-        icon={icon}
-        className={`fit-pct ${isWhite ? 'w' : 'b'}`}/>
+    return <div className="pc-frame center fit-pct" ref={ref} {...rest}>
+      <div className="pc">
+        <FontAwesomeIcon
+          icon={icon}
+          className={`fit-pct ${isWhite ? 'w' : 'b'}`}/>
+      </div>
     </div>;
   }));
 
@@ -40,12 +42,13 @@ interface DraggablePieceProps extends PieceBase {
   pos: JsPos;
 }
 export function DraggablePiece({pos, pc}: DraggablePieceProps) {
-  const {attributes, listeners, setNodeRef, transform} = useDraggable({
+  const {attributes, listeners, setNodeRef, transform, isDragging} = useDraggable({
     id: pos,
   });
 
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: isDragging ? 2 : undefined
   } : undefined;
   return <Piece ref={setNodeRef} pc={pc} style={style} {...listeners} {...attributes} />
 }

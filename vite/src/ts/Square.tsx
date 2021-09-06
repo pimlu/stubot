@@ -14,7 +14,7 @@ export const Square = React.memo(React.forwardRef<HTMLDivElement, SquareProps>(
     return <div
       ref={ref}
       className={`sq css-sq ${dark ? 'db' : 'lb'}`}>
-      <div className={`sq-inner center fit-abs ${bg ? bg : ''}`}>
+      <div className={`sq-inner fit-abs ${bg ? bg : ''}`}>
         {children}
       </div>
     </div>;

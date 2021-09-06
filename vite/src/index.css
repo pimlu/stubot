@@ -17,14 +17,15 @@ body {
 }
 .board {
   display: grid;
+  user-select: none;
 }
 .board > .sq {
   position: relative;
 }
-.pc {
+.pc-frame {
+  position: relative;
   z-index: 1;
   touch-action: none;
-  outline: none;
 }
 /* ??? https://css-tricks.com/almanac/properties/a/aspect-ratio/
 safari sucks, aspect-ratio hack to make it square. I tried so
@@ -72,7 +73,7 @@ doesn't always work either.
   width: 100% !important;
   height: 100% !important;
 }
-.board .pc svg * {
+.pc svg, .pc svg * {
   stroke-width: 5%;
   paint-order: stroke;
 }
