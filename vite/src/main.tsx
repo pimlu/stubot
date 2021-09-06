@@ -1,5 +1,10 @@
-import { render } from 'preact'
-import { App } from './ts/app'
-import './index.css'
+import React from 'react';
+import { render } from 'react-dom';
+import App from './ts/App';
+import init from './ts/wasm';
+import './index.css';
 
-render(<App />, document.getElementById('app')!)
+(async () => {
+  await init();
+  render(<App />, document.getElementById('app')!);
+})();

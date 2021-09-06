@@ -1,7 +1,12 @@
 import { defineConfig } from 'vite'
-import preact from '@preact/preset-vite'
+import reactRefresh from '@vitejs/plugin-react-refresh'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [preact()]
+  plugins: [reactRefresh()],
+  server: {
+    fs: {
+      allow: ['.','../..']
+    }
+  }
 })

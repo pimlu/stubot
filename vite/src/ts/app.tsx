@@ -1,11 +1,19 @@
-import init, {WasmSearcher, WasmPos} from '../../../stubot-wasm/pkg/stubot_wasm';
-init();
+import React, { useCallback, useMemo, useState } from 'react';
+import {WasmState} from './wasm';
+import Board from './Board';
+import { DndContext } from '@dnd-kit/core';
+import { JsPos, JsState } from './types';
 
-(window as any).WasmSearcher = WasmSearcher;
-(window as any).WasmPos = WasmPos;
 
-export function App() {
-  return (
-    <p>chess app</p>
-  )
+export default function App() {
+  const st = useMemo(() => new JsState(new WasmState()), []);
+  const [state, setState] = useState(st);
+  const flipped = false;
+  // look at the declaration of JsState to understand this nonsense
+  const move = useCallback((a: JsPos, b: JsPos) => setState(
+    state => state.mut(st => st.makeMove(a+b))
+  ), [setState]);
+  return (<DndContext>
+    <Board {...{state, move, flipped}} />
+  </DndContext>);
 }

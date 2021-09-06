@@ -5,4 +5,4 @@ First, idk how to conditionally do features/optimizations, so comment or uncomme
 
 Run one of these two:
 `wasm-pack build -t web --dev`
-`rustup run nightly wasm-pack build -t web --release -- -Z build-std=std,panic_abort`
+`wasm-pack build -t web --release`

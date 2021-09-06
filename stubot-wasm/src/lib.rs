@@ -1,3 +1,4 @@
+use chess::Pos;
 use chess::{Move, State};
 use engine::{EngineMsg, SearchParams, Searcher};
 
@@ -27,7 +28,7 @@ impl WasmSearcher {
         let searcher = Searcher::new(stop.clone(), tx);
         WasmSearcher { searcher }
     }
-    pub fn search(&mut self, mut state: WasmPos, depth: u32) -> SearchResult {
+    pub fn search(&mut self, mut state: WasmState, depth: u32) -> SearchResult {
         let params = SearchParams::new(depth);
         let (mv, score) = self.searcher.negamax(&mut state.state, params);
         SearchResult { score, mv }
@@ -39,14 +40,14 @@ impl WasmSearcher {
 }
 
 #[wasm_bindgen]
-pub struct WasmPos {
+pub struct WasmState {
     state: State,
 }
 #[wasm_bindgen]
-impl WasmPos {
+impl WasmState {
     #[wasm_bindgen(constructor)]
-    pub fn new(fen: Option<String>) -> WasmPos {
-        WasmPos {
+    pub fn new(fen: Option<String>) -> WasmState {
+        WasmState {
             state: fen.map_or(State::default(), |s| str::parse(&s).unwrap()),
         }
     }
@@ -75,6 +76,23 @@ impl WasmPos {
     #[wasm_bindgen(js_name=boardString)]
     pub fn board_string(&self) -> String {
         self.state.board_string()
+    }
+}
+
+#[wasm_bindgen]
+pub struct WasmPos {
+    pos: Pos,
+}
+
+#[wasm_bindgen]
+impl WasmPos {
+    #[wasm_bindgen(constructor)]
+    pub fn new(y: i8, x: i8) -> WasmPos {
+        WasmPos { pos: Pos {y, x} }
+    }
+    #[wasm_bindgen(js_name=toString)]
+    pub fn to_string(&self) -> String {
+        self.pos.to_string()
     }
 }
 

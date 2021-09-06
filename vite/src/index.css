@@ -1,3 +1,53 @@
 * {
   box-sizing: border-box;
 }
+
+.board {
+  max-width: min(max(95vh, 400px), 800px);
+
+  display: grid;
+}
+.board > .sq {
+  aspect-ratio: 1;
+}
+.sq-inner.cover {
+  background: rgba(98,153,36,0.6);
+}
+.sq-inner.circ {
+  background: radial-gradient(rgba(20,85,30,0.5) 19%, rgba(0,0,0,0) 20%);
+}
+.sq-inner.frame {
+  background: radial-gradient(rgba(0,0,0,0) 79%, rgba(20,85,30,0.5) 80%);
+}
+.center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.board .pc {
+  width: 75%;
+  height: 75%;
+}
+.fit {
+  width: 100% !important;
+  height: 100% !important;
+}
+.board .pc svg {
+  stroke-width: 5%;
+  paint-order: stroke;
+}
+.board .pc .w {
+  color: #fff;
+  stroke: #000;
+}
+.board .pc .b {
+  color: #000;
+  stroke: #fff;
+}
+
+.board .db {
+  background: #b58863;
+}
+.board .lb {
+  background: #f0d9b5;
+}
