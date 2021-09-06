@@ -4,20 +4,22 @@ import Worker from './Worker?worker';
 
 export const splitMv = ([ax, ay, bx, by]: string): [JsPos, JsPos] => [ax+ay, bx+by];
 
+let worker: Worker | undefined = new Worker();
 export function negamax(q: AiQuery) {
-  const worker = new Worker();
+  if (!worker) worker = new Worker();
   const promise = new Promise<AiResponse>((res, rej) => {
-    worker.onmessage = (e) => {
+    worker!.onmessage = (e) => {
       res (e.data as AiResponse);
     };
-    worker.onerror = rej;
-    worker.postMessage(q);
+    worker!.onerror = rej;
+    worker!.postMessage(q);
   });
   return {
     promise,
     cancel() {
-      worker.onerror!(new Error('cancelled') as any);
-      worker.terminate();
+      worker?.onerror!(new Error('cancelled') as any);
+      worker?.terminate();
+      worker = undefined;
     }
   };
 }

@@ -1,3 +1,10 @@
+.intro {
+  padding: 8px;
+}
 .indent {
   margin-left: 22px;
+}
+.start-btn {
+  margin-top: 8px;
+  font-size: 1.2em;
 }

@@ -21,12 +21,18 @@ export default function Game({bot}: GameProps) {
   const canMove = bot ? bot.isWhite !== isWhite : true;
   useEffect(() => {
     if (canMove || !bot) return;
+    let finished = false;
     const {promise, cancel} = negamax({
       fen: `${state.st}`,
       depth: bot.depth
     });
-    promise.then(({mv}) => mkMove(...splitMv(mv)));
-    return cancel;
+    promise.then(({mv}) => {
+      finished = true;
+      mkMove(...splitMv(mv))
+    });
+    return () => {
+      if (!finished) cancel();
+    };
   }, [isWhite, bot, canMove]);
 
   return (<DndContext>

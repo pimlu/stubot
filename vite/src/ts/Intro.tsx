@@ -28,7 +28,7 @@ export default function Intro({setPhase}: IntroProps) {
   const opponentProps = radioProps(opponent, setOpponent);
   const colorProps = radioProps(color, setColor, opponent !== 'engine');
   return <div className="intro">
-    <h1>Create a game</h1>
+    <h1>Rust Chess</h1>
     <div className="flex-col">
       <label>
         <input type="radio" name="opponent" {...opponentProps('friend')} />
@@ -53,7 +53,7 @@ export default function Intro({setPhase}: IntroProps) {
         </div>
       </div>
       <div>
-        <button onClick={startGame}>Start</button>
+        <button className="start-btn" onClick={startGame}>Start</button>
       </div>
     </div>
 
