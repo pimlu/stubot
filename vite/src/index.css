@@ -1,14 +1,44 @@
+html, body {
+  overflow: hidden;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+body {
+  position: relative;
+}
 * {
   box-sizing: border-box;
 }
 
+.board-wrap {
+  position: relative;
+  max-width: min(max(100vh, 400px), 800px);
+}
 .board {
-  max-width: min(max(95vh, 400px), 800px);
-
   display: grid;
 }
 .board > .sq {
-  aspect-ratio: 1;
+  position: relative;
+}
+.pc {
+  z-index: 1;
+  touch-action: none;
+  outline: none;
+}
+/* ??? https://css-tricks.com/almanac/properties/a/aspect-ratio/
+safari sucks, aspect-ratio hack to make it square. I tried so
+much stuff to get this to work
+*/
+.css-sq::before {
+  float: left;
+  padding-top: 100%;
+  content: "";
+}
+.css-sq::after {
+  display: block;
+  content: "";
+  clear: both;
 }
 .sq-inner.cover {
   background: rgba(98,153,36,0.6);
@@ -25,14 +55,24 @@
   align-items: center;
 }
 .board .pc {
+  position: relative;
   width: 75%;
   height: 75%;
 }
-.fit {
+/* ??? safari sucks, I can't use fit-pct everyhere because
+it uses a different system for percent size, and fit-abs
+doesn't always work either.
+*/
+.fit-abs {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0; right: 0;
+}
+.fit-pct {
   width: 100% !important;
   height: 100% !important;
 }
-.board .pc svg {
+.board .pc svg * {
   stroke-width: 5%;
   paint-order: stroke;
 }

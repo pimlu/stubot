@@ -13,8 +13,8 @@ export const Square = React.memo(React.forwardRef<HTMLDivElement, SquareProps>(
   function Square({dark, bg, children}: SquareProps, ref) {
     return <div
       ref={ref}
-      className={`sq ${dark ? 'db' : 'lb'}`}>
-      <div className={`sq-inner center fit ${bg ? bg : ''}`}>
+      className={`sq css-sq ${dark ? 'db' : 'lb'}`}>
+      <div className={`sq-inner center fit-abs ${bg ? bg : ''}`}>
         {children}
       </div>
     </div>;
@@ -24,10 +24,9 @@ interface DroppableSquareProps extends SquareBase {
   pos: JsPos;
 }
 
-export function DroppableSquare({dark, pos, bg: bg_, children}: DroppableSquareProps) {
-  const {isOver, setNodeRef} = useDroppable({
+export function DroppableSquare({pos, bg, ...rest}: DroppableSquareProps) {
+  const {setNodeRef} = useDroppable({
     id: pos,
   });
-  const bg = isOver ? 'cover' : bg_;
-  return <Square ref={setNodeRef} {...{dark, bg, children}} />
+  return <Square ref={setNodeRef} {...{bg, ...rest}} />
 }

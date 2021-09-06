@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { useDndMonitor, DragEndEvent} from '@dnd-kit/core';
 
 import { WasmPos } from "./wasm";
-import { DroppableSquare, Square } from "./Square";
+import { DroppableSquare } from "./Square";
 import { JsPos, JsState } from "./types";
 import { Piece, DraggablePiece } from "./Piece";
 
@@ -30,7 +30,7 @@ export default function Board({state, move, isWhite}: BoardProps) {
   const validDest = (b?: JsPos) => !!selected && !!b && mvMap.get(selected)?.has(b);
   function onDragEnd(event: DragEndEvent) {
     const over = event.over?.id;
-    if (over) move(selected!, over);
+    if (validDest(over)) move(selected!, over!);
     setSelected(undefined);
   }
   useDndMonitor({
@@ -47,25 +47,30 @@ export default function Board({state, move, isWhite}: BoardProps) {
   if (!isWhite) ys.reverse();
 
 
-  return (<div className="board" style={{
-    gridTemplateColumns: `repeat(${bw}, 1fr)`
-  }}>
-    {ys.flatMap(i => xs.map(j => {
-      const pc = grid[i][j];
-      const pos: JsPos = `${new WasmPos(i, j)}`;
-      const dark = (i+j) % 2 === 0;
-      const Pc = mvMap.has(pos) ? DraggablePiece : Piece;
-      const hasPc = pc !== '.';
-      const piece = hasPc && <Pc {...{pos, pc}}/>;
+  return (
+    <div className="board-wrap css-sq">
+      <div className="board" style={{
+        gridTemplateColumns: `repeat(${bw}, 1fr)`,
+        gridTemplateRows: `repeat(${bh}, 1fr)`
+      }}>
+        {ys.flatMap(y => xs.map(x => {
+          const pc = grid[y][x];
+          const pos: JsPos = `${new WasmPos(y, x)}`;
+          const dark = (y+x) % 2 === 0;
+          const Pc = mvMap.has(pos) ? DraggablePiece : Piece;
+          const hasPc = pc !== '.';
+          const piece = hasPc && <Pc {...{pos, pc}}/>;
 
-      const isDest = validDest(pos);
-      const dropClass = hasPc ? 'frame' : 'circ';
-      const bg = isDest ? dropClass : undefined;
-
-      const Sq = isDest ? DroppableSquare : Square;
-      return <Sq key={pos} {...{pos, dark, bg}}>
-        {piece}
-      </Sq>;
-    }))}
-  </div>);
+          const isSrc = selected === pos;
+          const isDest = validDest(pos);
+          const dropClass = hasPc ? 'frame' : 'circ';
+          const bg = isSrc ? 'cover' :
+            isDest ? dropClass :
+              undefined;
+          return <DroppableSquare key={pos} {...{pos, dark, bg}}>
+            {piece}
+          </DroppableSquare>;
+        }))}
+      </div>
+    </div>);
 }

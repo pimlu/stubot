@@ -32,7 +32,7 @@ export const Piece = React.memo(React.forwardRef<HTMLDivElement, PieceProps>(
     return <div className="pc" ref={ref} {...rest}>
       <FontAwesomeIcon
         icon={icon}
-        className={`fit ${isWhite ? 'w' : 'b'}`}/>
+        className={`fit-pct ${isWhite ? 'w' : 'b'}`}/>
     </div>;
   }));
 
