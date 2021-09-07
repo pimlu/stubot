@@ -11,7 +11,7 @@
   -webkit-user-select: none;
   user-select: none;
 }
-.board > .sq {
+.board .sq {
   position: relative;
 }
 .pc-frame {

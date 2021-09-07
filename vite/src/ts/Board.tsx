@@ -53,28 +53,30 @@ export default function Board({state, mkMove, canMove, flipped}: BoardProps) {
 
   return (
     <div className="board-wrap css-sq">
-      <div className="board" style={{
+      <div className="board" role="grid" style={{
         gridTemplateColumns: `repeat(${bw}, 1fr)`,
         gridTemplateRows: `repeat(${bh}, 1fr)`
       }}>
-        {ys.flatMap(y => xs.map(x => {
-          const pc = grid[y][x];
-          const pos: JsPos = `${new WasmPos(y, x)}`;
-          const dark = (y+x) % 2 === 0;
-          const Pc = mvMap.has(pos) ? DraggablePiece : Piece;
-          const hasPc = pc !== '.';
-          const piece = hasPc && <Pc {...{pos, pc}}/>;
+        {ys.flatMap(y => <div key={y} role="row" className="d-contents">
+          {xs.map(x => {
+            const pc = grid[y][x];
+            const pos: JsPos = `${new WasmPos(y, x)}`;
+            const dark = (y+x) % 2 === 0;
+            const Pc = mvMap.has(pos) ? DraggablePiece : Piece;
+            const hasPc = pc !== '.';
+            const piece = hasPc && <Pc {...{pos, pc}}/>;
 
-          const isSrc = selected === pos;
-          const isDest = validDest(pos);
-          const dropClass = hasPc ? 'frame' : 'circ';
-          const bg = isSrc ? 'cover' :
-            isDest ? dropClass :
-              undefined;
-          return <DroppableSquare key={pos} {...{pos, dark, bg}}>
-            {piece}
-          </DroppableSquare>;
-        }))}
+            const isSrc = selected === pos;
+            const isDest = validDest(pos);
+            const dropClass = hasPc ? 'frame' : 'circ';
+            const bg = isSrc ? 'cover' :
+              isDest ? dropClass :
+                undefined;
+            const desc = pos;
+            return <DroppableSquare key={pos} {...{desc, pos, dark, bg}}>
+              {piece}
+            </DroppableSquare>;
+          })}</div>)}
       </div>
     </div>);
 }

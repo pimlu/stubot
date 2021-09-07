@@ -50,5 +50,5 @@ export function DraggablePiece({pos, pc}: DraggablePieceProps) {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
     zIndex: isDragging ? 2 : undefined
   } : undefined;
-  return <Piece ref={setNodeRef} pc={pc} style={style} {...listeners} {...attributes} />
+  return <Piece ref={setNodeRef} pc={pc} id={`pc-${pos}`} style={style} {...listeners} {...attributes} />
 }

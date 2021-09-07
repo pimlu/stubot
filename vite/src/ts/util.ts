@@ -1,11 +1,11 @@
 import { AiQuery, AiResponse, JsPos } from './types';
 import Worker from './Worker?worker';
 
-
+export const ric = window.requestIdleCallback ?? queueMicrotask;
 export const splitMv = ([ax, ay, bx, by]: string): [JsPos, JsPos] => [ax+ay, bx+by];
 
 let worker: Worker | undefined;
-requestIdleCallback(() => {
+ric(() => {
   if (!worker) worker = new Worker();
 });
 export function negamax(q: AiQuery) {

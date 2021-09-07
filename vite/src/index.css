@@ -45,3 +45,6 @@ much stuff to get this to work
   display: flex;
   flex-direction: column;
 }
+.d-contents {
+  display: contents;
+}
