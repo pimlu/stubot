@@ -31,6 +31,6 @@ export interface AiQuery {
 }
 export interface AiResponse {
   score: number;
-  mv: string;
+  mv?: string;
   nodes: number;
 }

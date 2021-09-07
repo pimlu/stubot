@@ -5,6 +5,10 @@
 }
 .board {
   display: grid;
+}
+* {
+  /* thanks safari */
+  -webkit-user-select: none;
   user-select: none;
 }
 .board > .sq {

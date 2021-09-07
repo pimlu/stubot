@@ -28,7 +28,7 @@ export default function Game({bot}: GameProps) {
     });
     promise.then(({mv}) => {
       finished = true;
-      mkMove(...splitMv(mv))
+      if (mv) mkMove(...splitMv(mv))
     });
     return () => {
       if (!finished) cancel();
