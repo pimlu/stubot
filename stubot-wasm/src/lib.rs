@@ -63,11 +63,12 @@ impl WasmState {
             .into_iter()
             .map(|mv| mv.to_string())
             .collect();
-        mvs.join(", ")
+        mvs.join(" ")
     }
     #[wasm_bindgen(js_name=makeMove)]
     pub fn make_move(&mut self, mv: String) {
-        let real_mv = self.state.find_move(&mv).unwrap();
+        let real_mv = self.state.find_move(&mv)
+            .unwrap_or_else(|| self.state.find_move(&(mv + "q")).unwrap());
         self.state.make_move(real_mv);
     }
     pub fn score(&mut self) -> i16 {

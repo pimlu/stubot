@@ -15,9 +15,9 @@ export default function Game({bot}: GameProps) {
   
   const flipped = bot ? bot.isWhite : !isWhite;
   // look at the declaration of JsState to understand this nonsense
-  const mkMove = useCallback((a: JsPos, b: JsPos) => setState(
-    state => state.mut(st => st.makeMove(a+b))
-  ), [setState]);
+  const mkMove = useCallback((a: JsPos, b: JsPos) =>
+    setState(state => state.mut(st => st.makeMove(a+b))
+    ), [setState]);
   const canMove = bot ? bot.isWhite !== isWhite : true;
   useEffect(() => {
     if (canMove || !bot) return;
