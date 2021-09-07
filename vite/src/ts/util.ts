@@ -4,7 +4,10 @@ import Worker from './Worker?worker';
 
 export const splitMv = ([ax, ay, bx, by]: string): [JsPos, JsPos] => [ax+ay, bx+by];
 
-let worker: Worker | undefined = new Worker();
+let worker: Worker | undefined;
+requestIdleCallback(() => {
+  if (!worker) worker = new Worker();
+});
 export function negamax(q: AiQuery) {
   if (!worker) worker = new Worker();
   const promise = new Promise<AiResponse>((res, rej) => {

@@ -4,7 +4,8 @@ import App from './ts/App';
 import init from './ts/wasm';
 import './index.css';
 
-(async () => {
-  await init();
-  render(<App />, document.getElementById('app')!);
-})();
+requestIdleCallback(() => {
+  init();
+}, { timeout: 250 });
+
+render(<App />, document.getElementById('app')!);

@@ -37,15 +37,18 @@ export default function Intro({setPhase}: IntroProps) {
       <div>
         <label>
           <input type="radio" name="opponent" {...opponentProps('engine')} />
-              vs. Engine level {level}
+              vs. Engine{' '}
         </label>
-        <input type="range"
-          disabled={opponent !== 'engine'}
-          min={1} max={7}
-          value={level}
-          onChange={e => setLevel(+e.target.value)}/>
+        <label onClick={() => setOpponent('engine')}>
+          level {level}
+          <input type="range"
+            disabled={opponent !== 'engine'}
+            min={1} max={7}
+            value={level}
+            onChange={e => setLevel(+e.target.value)}/>
+        </label>
 
-        <div className="indent">
+        <div className="indent" onClick={() => setOpponent('engine')}>
               Play as:{' '}
           <label><input type="radio" name="color" {...colorProps('white')}/> White</label>
           <label><input type="radio" name="color" {...colorProps('black')}/> Black</label>

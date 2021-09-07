@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {WasmState} from './wasm';
+import {initDone, isInitDone, WasmState} from './wasm';
 import Board from './Board';
 import { DndContext } from '@dnd-kit/core';
 import { GameBot, JsPos, JsState, Phase } from './types';
@@ -9,7 +9,7 @@ interface GameProps {
   setPhase: React.Dispatch<Phase>;
   bot?: GameBot;
 }
-export default function Game({bot}: GameProps) {
+const GameBody = React.memo(function GameBody({bot}: GameProps) {
   const [state, setState] = useState(() => new JsState(new WasmState()));
   const isWhite = useMemo(() => state.st.isWhite(), [state]);
   
@@ -38,4 +38,13 @@ export default function Game({bot}: GameProps) {
   return (<DndContext>
     <Board {...{state, mkMove, canMove, flipped}} />
   </DndContext>);
+});
+
+export default function Game(p: GameProps) {
+  const [loaded, setLoaded] = useState(isInitDone);
+  useEffect(() => {
+    if (loaded) return;
+    initDone.then(() => setLoaded(true));
+  }, [loaded]);
+  return loaded ? <GameBody {...p}/> : <>Loading...</>;
 }
