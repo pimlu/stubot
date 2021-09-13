@@ -50,6 +50,7 @@ export default function Board({state, mkMove, canMove, flipped}: BoardProps) {
   const ys = [...Array(bh)].map((_,i) => i);
   const xs = [...Array(bw)].map((_,j) => j);
   if (!flipped) ys.reverse();
+  if (flipped) xs.reverse();
 
   return (
     <div className="board-wrap css-sq">
