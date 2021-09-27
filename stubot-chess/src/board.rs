@@ -1,7 +1,10 @@
 use super::*;
 
-use std::fmt;
-use std::str;
+use core::fmt;
+use core::str;
+
+use alloc::string::*;
+use alloc::vec::Vec;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct StateExtra {
@@ -348,14 +351,14 @@ impl fmt::Display for State {
 }
 
 impl str::FromStr for State {
-    type Err = ParseError;
+    type Err = ChessParseError;
 
     fn from_str(fen: &str) -> Result<Self, Self::Err> {
         // seems like errors are a pain in rust, make the pain go away :)
-        fn conv_err<T, E>(res: Result<T, E>) -> Result<T, ParseError> {
+        fn conv_err<T, E>(res: Result<T, E>) -> Result<T, ChessParseError> {
             match res.ok() {
                 Some(x) => Ok(x),
-                None => Err(ParseError::new("FEN")),
+                None => Err(ChessParseError::new("FEN")),
             }
         }
         let p_sq = |c: char| conv_err(str::parse::<Sq>(&c.to_string()));
@@ -366,7 +369,7 @@ impl str::FromStr for State {
             let clr_add = match *turn {
                 "w" => 0,
                 "b" => 1,
-                _ => return Err(ParseError::new("FEN")),
+                _ => return Err(ChessParseError::new("FEN")),
             };
             let full_u = conv_err(str::parse::<u32>(full))?;
             // full turns are double, we start at ply 0, not full turn 1
@@ -382,7 +385,7 @@ impl str::FromStr for State {
                     'Q' => (Color::White, CastleSide::Long),
                     'K' => (Color::White, CastleSide::Short),
                     '-' => continue,
-                    _ => return Err(ParseError::new("FEN")),
+                    _ => return Err(ChessParseError::new("FEN")),
                 };
                 extra.set_castle(clr, side, true);
             }
@@ -390,7 +393,7 @@ impl str::FromStr for State {
 
             for (y, row) in board.rsplit("/").enumerate() {
                 if y >= BOARD_DIM.y as usize {
-                    return Err(ParseError::new("FEN"));
+                    return Err(ChessParseError::new("FEN"));
                 }
                 let mut x: usize = 0;
                 for c in row.chars() {
@@ -398,7 +401,7 @@ impl str::FromStr for State {
                         x += c as usize - '0' as usize;
                     } else {
                         if x >= BOARD_DIM.x as usize {
-                            return Err(ParseError::new("FEN"));
+                            return Err(ChessParseError::new("FEN"));
                         }
                         state.set(
                             Pos {
@@ -414,7 +417,7 @@ impl str::FromStr for State {
 
             Ok(state)
         } else {
-            Err(ParseError::new("FEN"))
+            Err(ChessParseError::new("FEN"))
         }
     }
 }

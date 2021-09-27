@@ -2,6 +2,7 @@
 members = [
     "stubot-chess",
     "stubot-engine",
+    "stubot-mcu",
     "stubot-perftree",
     "stubot-uci",
     "stubot-wasm"

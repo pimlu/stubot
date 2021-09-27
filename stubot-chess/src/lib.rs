@@ -1,3 +1,9 @@
+#![no_std]
+#[cfg(test)]
+extern crate std;
+#[macro_use]
+extern crate alloc;
+
 mod board;
 mod eval;
 mod perft;

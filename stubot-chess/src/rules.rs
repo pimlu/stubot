@@ -1,7 +1,10 @@
 use super::card;
 use super::*;
 
-use std::cmp;
+use core::cmp;
+
+use alloc::string::*;
+use alloc::vec::Vec;
 
 fn pawn_dir(clr: Color) -> Pos {
     match clr {
@@ -61,7 +64,7 @@ impl State {
     }
     // extends out rays/leaps in reverse to see if someone attacks
     fn is_attacked(&self, orig: Pos, enemy: Color) -> bool {
-        use std::cell::Cell;
+        use core::cell::Cell;
         let enemy_knight = Sq::new(enemy, Type::Knight);
         for &opt in KNIGHT_OPTS {
             if self.get(orig + opt) == Some(&enemy_knight) {

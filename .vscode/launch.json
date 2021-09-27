@@ -115,6 +115,46 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        // taken from the cortex-debug examples
+        {
+            "cwd": "${workspaceRoot}/stubot-mcu",
+            "executable": "../target/thumbv7em-none-eabihf/debug/stubot-mcu",
+            "name": "openocd-gdb",
+            "request": "attach",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "searchDir": [
+                "${workspaceRoot}/stubot-mcu",
+                "${workspaceRoot}",
+            ],
+            "configFiles": [
+                "openocd.cfg",
+            ],
+            "overrideAttachCommands": [
+                "set mem inaccessible-by-default off",
+                "monitor halt"
+            ],
+            "postRestartCommands": [
+                "monitor psoc6 reset_halt sysresetreq",
+                "monitor gdb_sync",
+                "stepi"
+            ],
+
+            // OS/user specific paths. They are better set using environment variables. settings.json
+            // is another place you can set them. Spaces, special chars in path names can cause issues
+            "osx": {
+                // "armToolchainPath": "/Applications/ModusToolbox_2.0/tools/gcc-7.2.1-1.0/bin",
+                "toolchainPath": "/usr/local/bin",
+                "serverpath": "/usr/local/bin/openocd",
+            },
+            // Optional entries
+            // svdFiles can be very large.
+            //"svdFile": "/Applications/ModusToolbox_2.0/libraries/udd-1.1/udd/devices/MXS40/PSoC6ABLE2/studio/svd/psoc6_01.svd",
+            //"showDevDebugOutput": true, // Shows output of GDB, helpful when something is not working right
+            
+            // Only for Cortex-Debug extension developers
+            // "debugServer": 4711,
         }
     ]
 }

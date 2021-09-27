@@ -9,16 +9,16 @@ name = "chess"
 path = "src/lib.rs"
 doctest = false
 
+
+[features]
+test = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.derive_more]
 version = "0.99.0"
 default-features = false
 features = ["add", "add_assign", "into", "from", "not", "mul"]
-
-[dependencies]
-num-traits = "0.2"
-num-derive = "0.3"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

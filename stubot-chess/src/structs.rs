@@ -1,10 +1,11 @@
 extern crate derive_more;
 
 use derive_more::{Add, AddAssign, From, Into, Mul, Neg, Sub, SubAssign};
-use num_derive::FromPrimitive;
 
-use std::fmt;
-use std::str;
+use core::fmt;
+use core::str;
+
+use alloc::string::*;
 
 // row major
 pub const BOARD_DIM: Pos = Pos { x: 8, y: 8 };
@@ -16,7 +17,7 @@ pub fn rel_y(clr: Color, y: i8) -> i8 {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Color {
     White = 0,
     Black,
@@ -49,7 +50,7 @@ impl Color {
         }
     }
 }
-#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Type {
     Pawn = 0,
     Knight,
@@ -58,7 +59,7 @@ pub enum Type {
     Queen,
     King,
 }
-#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum CastleSide {
     Long = 0,
     Short,
@@ -119,19 +120,19 @@ impl Sq {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParseError {
+pub struct ChessParseError {
     pub name: String,
 }
 
-impl ParseError {
+impl ChessParseError {
     pub fn new(name: &str) -> Self {
-        ParseError {
+        ChessParseError {
             name: name.to_string(),
         }
     }
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for ChessParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "parse {} error", self.name)
     }
@@ -176,7 +177,7 @@ impl fmt::Display for Sq {
 
 // super lazy way to parse
 impl str::FromStr for Sq {
-    type Err = ParseError;
+    type Err = ChessParseError;
 
     fn from_str(sq_str: &str) -> Result<Self, Self::Err> {
         if sq_str == "." {
@@ -197,7 +198,7 @@ impl str::FromStr for Sq {
                 }
             }
         }
-        Err(ParseError::new("Sq"))
+        Err(ChessParseError::new("Sq"))
     }
 }
 
@@ -209,17 +210,17 @@ impl fmt::Display for Pos {
 }
 
 impl str::FromStr for Pos {
-    type Err = ParseError;
+    type Err = ChessParseError;
 
     fn from_str(pos: &str) -> Result<Self, Self::Err> {
         if pos.len() < 2 {
-            return Err(ParseError::new("Pos"));
+            return Err(ChessParseError::new("Pos"));
         }
 
         let x = pos.chars().nth(0).unwrap() as i8 - 'a' as i8;
         let y: i8 = match str::parse(&pos[1..]).ok() {
             Some(v) => Ok(v),
-            None => Err(ParseError::new("Pos")),
+            None => Err(ChessParseError::new("Pos")),
         }?;
         Ok(Pos { x, y: y - 1 })
     }

@@ -1,10 +1,13 @@
+// no_std doesn't actually work, apparently wasm-bindgen gave up on it :(
+#![no_std]
+extern crate alloc;
+
+use alloc::string::*;
+use alloc::vec::Vec;
+
 use chess::{Color, Pos};
 use chess::{Move, State};
-use engine::{EngineMsg, SearchParams, Searcher};
-
-use std::sync::atomic::AtomicBool;
-use std::sync::mpsc;
-use std::sync::Arc;
+use engine::{BlockSignal, SearchParams, Searcher};
 
 use wasm_bindgen::prelude::*;
 
@@ -16,16 +19,14 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub struct WasmSearcher {
-    searcher: Searcher,
+    searcher: Searcher<BlockSignal>,
 }
 
 #[wasm_bindgen]
 impl WasmSearcher {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmSearcher {
-        let stop = Arc::new(AtomicBool::new(false));
-        let (tx, _) = mpsc::channel::<EngineMsg>();
-        let searcher = Searcher::new(stop.clone(), tx);
+        let searcher = Searcher::<BlockSignal>::default();
         WasmSearcher { searcher }
     }
     pub fn search(&mut self, mut state: WasmState, depth: u32) -> SearchResult {
@@ -67,7 +68,9 @@ impl WasmState {
     }
     #[wasm_bindgen(js_name=makeMove)]
     pub fn make_move(&mut self, mv: String) {
-        let real_mv = self.state.find_move(&mv)
+        let real_mv = self
+            .state
+            .find_move(&mv)
             .unwrap_or_else(|| self.state.find_move(&(mv + "q")).unwrap());
         self.state.make_move(real_mv);
     }
@@ -93,7 +96,7 @@ pub struct WasmPos {
 impl WasmPos {
     #[wasm_bindgen(constructor)]
     pub fn new(y: i8, x: i8) -> WasmPos {
-        WasmPos { pos: Pos {y, x} }
+        WasmPos { pos: Pos { y, x } }
     }
     #[wasm_bindgen(js_name=toString)]
     pub fn to_string(&self) -> String {

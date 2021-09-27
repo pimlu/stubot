@@ -1,0 +1,32 @@
+[build]
+target = "thumbv7em-none-eabihf"
+rustflags = [
+  "-C", "link-args=-L ./stubot-mcu -T link.x",
+]
+
+[unstable]
+build-std = ["core", "alloc"]
+
+[profile.dev]
+opt-level = 0
+# stubot doesn't fit unless you optimize...
+# that's fine, since I debug stubot on desktop anyway
+[profile.dev.package.stubot-chess]
+opt-level = "z"
+[profile.dev.package.stubot-engine]
+opt-level = "z"
+[profile.dev.package."*"]
+opt-level = "z"
+
+# fixes LTO for dev for some reason?
+#[profile.dev.package.compiler_builtins]
+#overflow-checks = false
+
+[profile.release]
+opt-level = "z"
+# symbols are nice and they don't increase the size on Flash
+debug = true
+[profile.release.package.stubot-chess]
+opt-level = 3
+[profile.release.package.stubot-engine]
+opt-level = 3

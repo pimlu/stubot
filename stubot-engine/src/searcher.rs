@@ -2,19 +2,20 @@ use super::*;
 
 use chess::{Move, State, MATE_BOUND};
 
-use std::cmp;
+use core::cmp;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::sync::Arc;
+#[cfg(test)]
+use alloc::string::*;
+use alloc::vec::Vec;
+
+#[cfg(feature = "std")]
 use std::time::{Duration, Instant};
 
-pub struct Searcher {
-    pub stop: Arc<AtomicBool>,
+// NEGAMAX_HACK misses checkmates at depth 0, but is way faster
+const NEGAMAX_HACK: bool = true;
+pub struct Searcher<Signal: SearcherSignal> {
     pub nodes: u128,
-    pub tx: mpsc::Sender<EngineMsg>,
-    // misses checkmates at depth 0, but way faster
-    pub negamax_hack: bool,
+    pub signal: Signal,
 }
 
 pub struct SearchParams {
@@ -51,15 +52,17 @@ fn tick_score(enemy_score: i16) -> i16 {
     }
 }
 
-impl Searcher {
-    pub fn new(stop: Arc<AtomicBool>, tx: mpsc::Sender<EngineMsg>) -> Self {
-        Searcher {
-            stop,
-            nodes: 0,
-            tx,
-            negamax_hack: true,
-        }
+impl<S: SearcherSignal + Default> Default for Searcher<S> {
+    fn default() -> Self {
+        Self::new(S::default())
     }
+}
+
+impl<S: SearcherSignal> Searcher<S> {
+    pub fn new(signal: S) -> Self {
+        Searcher { nodes: 0, signal }
+    }
+    #[cfg(feature = "std")]
     pub fn uci_negamax(&mut self, mut state: State, depth: u32) {
         self.nodes = 0;
         let start = Instant::now();
@@ -67,13 +70,13 @@ impl Searcher {
         let mut best_mv = None;
         for d in 1..=depth {
             let (mv, score) = self.negamax(&mut state, SearchParams::new(d));
-            if self.stop.load(Ordering::Relaxed) {
+            if self.signal.should_stop() {
                 break;
             }
             let el = start.elapsed();
             let nps = Duration::from_secs(1).as_micros() * self.nodes / start.elapsed().as_micros();
-            self.tx
-                .send(EngineMsg::Info(UciInfo {
+            self.signal
+                .tx_send(EngineMsg::Info(UciInfo {
                     depth: d,
                     score,
                     nodes: self.nodes,
@@ -84,12 +87,14 @@ impl Searcher {
                 .unwrap();
             best_mv = mv;
         }
-        self.tx.send(EngineMsg::BestMove(best_mv.unwrap())).unwrap();
+        self.signal
+            .tx_send(EngineMsg::BestMove(best_mv.unwrap()))
+            .unwrap();
     }
     pub fn negamax(&mut self, state: &mut State, mut params: SearchParams) -> (Option<Move>, i16) {
         self.nodes += 1;
-        if params.depth == 0 || self.stop.load(Ordering::Relaxed) {
-            let abs_score = if self.negamax_hack {
+        if params.depth == 0 || self.signal.should_stop() {
+            let abs_score = if NEGAMAX_HACK {
                 state.fast_score()
             } else {
                 state.slow_score()
@@ -139,14 +144,20 @@ impl Searcher {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::sync::mpsc;
+
     const HORIZON_QUEEN: &str = "r1bk1b1r/ppppqppp/5n2/4B3/8/2N5/PPP1QPPP/R3KBNR w KQ - 3 9";
     const MATE_2_B: &str = "6k1/ppp5/8/4K1p1/b4r2/8/3r4/8 b - - 7 39";
     const ROOK_MATE_W: &str = "5k2/8/5K1R/8/8/8/8/8 w - - 0 1";
     const ROOK_MATE_B: &str = "8/8/8/8/7p/5k1r/8/5K2 b - - 0 1";
 
-    fn searcher() -> Searcher {
+    fn searcher() -> Searcher<StdSignal> {
         let (tx, _) = mpsc::channel::<EngineMsg>();
-        Searcher::new(Default::default(), tx)
+
+        Searcher::new(StdSignal {
+            stop: Default::default(),
+            tx,
+        })
     }
     fn get_pv(fen: &str, depth: u32) -> String {
         let mut search = searcher();

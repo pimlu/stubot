@@ -1,4 +1,4 @@
-use engine::{EngineMsg, Searcher};
+use engine::{EngineMsg, Searcher, StdSignal};
 
 use futures::future::FutureExt;
 use futures::prelude::*;
@@ -135,7 +135,10 @@ impl UciState {
             let (abort_fut, abort_handle) = future::abortable(future::pending::<()>());
 
             let pos = self.position.clone();
-            let mut searcher = Searcher::new(self.stop.clone(), self.tx.clone());
+            let mut searcher = Searcher::new(StdSignal {
+                stop: self.stop.clone(),
+                tx: self.tx.clone(),
+            });
             let job_task = task::spawn_blocking(move || {
                 searcher.uci_negamax(pos, depth);
             });

@@ -1,6 +1,9 @@
 use chess::{Move, CHECKMATE, MATE_BOUND};
 
-use std::fmt;
+use core::fmt;
+
+use alloc::string::*;
+use alloc::vec::Vec;
 
 pub enum EngineMsg {
     Input(String),
