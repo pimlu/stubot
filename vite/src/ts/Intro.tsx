@@ -7,7 +7,7 @@ interface IntroProps {
   setPhase: React.Dispatch<Phase>;
 }
 export default function Intro({setPhase}: IntroProps) {
-  const [opponent, setOpponent] = useState('friend');
+  const [opponent, setOpponent] = useState('engine');
   const [level, setLevel] = useState(4);
   const [color, setColor] = useState('random');
   function startGame() {
@@ -30,10 +30,6 @@ export default function Intro({setPhase}: IntroProps) {
   return <div className="intro">
     <h1>Rust Chess</h1>
     <div className="flex-col">
-      <label>
-        <input type="radio" name="opponent" {...opponentProps('friend')} />
-          vs. Friend (local)
-      </label>
       <div>
         <label>
           <input type="radio" name="opponent" {...opponentProps('engine')} />
@@ -55,6 +51,10 @@ export default function Intro({setPhase}: IntroProps) {
           <label><input type="radio" name="color" {...colorProps('random')}/> Random</label>
         </div>
       </div>
+      <label>
+        <input type="radio" name="opponent" {...opponentProps('friend')} />
+          vs. Friend (local)
+      </label>
       <div>
         <button className="start-btn" onClick={startGame}>Start</button>
       </div>
