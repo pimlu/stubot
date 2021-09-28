@@ -19,19 +19,21 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub struct WasmSearcher {
-    searcher: Searcher<BlockSignal>,
+    searcher: Searcher,
 }
 
 #[wasm_bindgen]
 impl WasmSearcher {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmSearcher {
-        let searcher = Searcher::<BlockSignal>::default();
+        let searcher = Searcher::new();
         WasmSearcher { searcher }
     }
     pub fn search(&mut self, mut state: WasmState, depth: u32) -> SearchResult {
         let params = SearchParams::new(depth);
-        let (mv, score) = self.searcher.negamax(&mut state.state, params);
+        let (mv, score) = self
+            .searcher
+            .negamax(&mut state.state, params, &BlockSignal {});
         SearchResult { score, mv }
     }
     #[wasm_bindgen(getter)]

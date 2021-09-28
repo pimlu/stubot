@@ -44,11 +44,11 @@ fn main() -> ! {
         .unwrap();
 
     let mut state = State::default();
-    let mut searcher = Searcher::<BlockSignal>::default();
+    let mut searcher = Searcher::new();
 
     loop {
         writeln!(usart, "{}", state.board_string()).unwrap();
-        let (mv, score) = searcher.negamax(&mut state, SearchParams::new(4));
+        let (mv, score) = searcher.negamax(&mut state, SearchParams::new(4), &BlockSignal {});
         writeln!(usart, "best move: {}. score: {}.", mv.unwrap(), score).unwrap();
         led.toggle().unwrap();
     }
