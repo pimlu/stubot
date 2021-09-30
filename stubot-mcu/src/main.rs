@@ -48,7 +48,7 @@ fn main() -> ! {
 
     loop {
         writeln!(usart, "{}", state.board_string()).unwrap();
-        let (mv, score) = searcher.negamax(&mut state, SearchParams::new(4), &BlockSignal {});
+        let (mv, score) = searcher.iter_negamax(&mut state, 4, &BlockSignal {});
         writeln!(usart, "best move: {}. score: {}.", mv.unwrap(), score).unwrap();
         led.toggle().unwrap();
     }

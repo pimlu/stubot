@@ -5,9 +5,8 @@ extern crate alloc;
 use alloc::string::*;
 use alloc::vec::Vec;
 
-use chess::{Color, Pos};
-use chess::{Move, State};
-use engine::{BlockSignal, SearchParams, Searcher};
+use chess::*;
+use engine::*;
 
 use wasm_bindgen::prelude::*;
 
@@ -29,11 +28,10 @@ impl WasmSearcher {
         let searcher = Searcher::new();
         WasmSearcher { searcher }
     }
-    pub fn search(&mut self, mut state: WasmState, depth: u32) -> SearchResult {
-        let params = SearchParams::new(depth);
+    pub fn search(&mut self, mut state: WasmState, depth: i32) -> SearchResult {
         let (mv, score) = self
             .searcher
-            .negamax(&mut state.state, params, &BlockSignal {});
+            .iter_negamax(&mut state.state, depth, &BlockSignal {});
         SearchResult { score, mv }
     }
     #[wasm_bindgen(getter)]

@@ -14,7 +14,7 @@ use std::time::Duration;
 
 const TIME_MUL: f64 = 1.0 / 60.0;
 const INC_MUL: f64 = 0.97;
-const INF_DEPTH: u32 = 999;
+const INF_DEPTH: i32 = 999;
 
 pub struct UciState {
     stop: Arc<AtomicBool>,
@@ -134,11 +134,11 @@ impl UciState {
 
             let (abort_fut, abort_handle) = future::abortable(future::pending::<()>());
 
-            let pos = self.position.clone();
+            let mut pos = self.position.clone();
             let mut searcher = Searcher::new();
             let signal = StdSignal::new(self.stop.clone(), self.tx.clone());
             let job_task = task::spawn_blocking(move || {
-                searcher.iter_negamax(pos, depth, &signal);
+                searcher.iter_negamax(&mut pos, depth, &signal);
             });
 
             // abort or timeout, whichever happens first

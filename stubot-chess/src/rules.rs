@@ -301,8 +301,7 @@ impl State {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::perft::test::KIWIPETE;
+    use super::{testpos::*, *};
 
     fn test_move(st: Option<&str>, moves_str: &str) -> Option<Move> {
         let mut state: State = st

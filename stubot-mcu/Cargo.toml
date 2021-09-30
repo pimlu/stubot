@@ -11,7 +11,7 @@ log-itm = []
 
 [dependencies]
 stubot-chess = { path = "../stubot-chess" }
-stubot-engine = { path = "../stubot-engine", default-features = false }
+stubot-engine = { path = "../stubot-engine" }
 stm32g4xx-hal = { version = "0.0.0", git = "https://github.com/stm32-rs/stm32g4xx-hal.git", features=["stm32g431"] }
 # stm32g4xx-hal ->stm32g4 -> cortex-m-rt is a different version and idk how to
 # dedupe besides this. see `cargo tree`

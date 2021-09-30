@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 stubot-chess = { path = "../stubot-chess" }
-stubot-engine = { path = "../stubot-engine", default-features = false }
+stubot-engine = { path = "../stubot-engine" }
 wasm-bindgen = { version = "0.2.78" }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

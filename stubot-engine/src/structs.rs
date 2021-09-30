@@ -5,6 +5,8 @@ use core::fmt;
 use alloc::string::*;
 use alloc::vec::Vec;
 
+pub type FoundMv = (Option<Move>, i16);
+
 pub enum EngineMsg {
     Input(String),
     Output(String),
@@ -13,7 +15,7 @@ pub enum EngineMsg {
 }
 
 pub struct UciInfo {
-    pub depth: u32,
+    pub depth: i32,
     pub score: i16,
     pub nodes: u128,
     pub nps: u128,

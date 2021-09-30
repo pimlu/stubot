@@ -1,7 +1,4 @@
-#[cfg(feature = "std")]
 use super::*;
-
-use chess::Move;
 
 #[cfg(feature = "std")]
 use {
@@ -19,8 +16,8 @@ type MsgError = mpsc::SendError<EngineMsg>;
 type MsgSend = Result<(), MsgError>;
 pub trait SearcherSignal {
     fn should_stop(&self) -> bool;
-    fn send_partial(&self, nodes: u128, depth: u32, best: Option<Move>, score: i16) -> MsgSend;
-    fn send_best(&self, best: Option<Move>) -> MsgSend;
+    fn send_partial(&self, nodes: u128, depth: i32, mv: FoundMv) -> MsgSend;
+    fn send_best(&self, best: FoundMv) -> MsgSend;
 }
 #[derive(Default)]
 pub struct BlockSignal {}
@@ -29,10 +26,10 @@ impl SearcherSignal for BlockSignal {
     fn should_stop(&self) -> bool {
         false
     }
-    fn send_partial(&self, _nodes: u128, _depth: u32, _best: Option<Move>, _score: i16) -> MsgSend {
+    fn send_partial(&self, _nodes: u128, _depth: i32, _mv: FoundMv) -> MsgSend {
         Result::Ok(())
     }
-    fn send_best(&self, _best: Option<Move>) -> MsgSend {
+    fn send_best(&self, _best: FoundMv) -> MsgSend {
         Result::Ok(())
     }
 }
@@ -60,7 +57,8 @@ impl SearcherSignal for StdSignal {
     fn should_stop(&self) -> bool {
         self.stop.load(Ordering::Relaxed)
     }
-    fn send_partial(&self, nodes: u128, depth: u32, best: Option<Move>, score: i16) -> MsgSend {
+    fn send_partial(&self, nodes: u128, depth: i32, mv: FoundMv) -> MsgSend {
+        let (best, score) = mv;
         let el = self.start.elapsed();
         let nps = Duration::from_secs(1).as_micros() * nodes / self.start.elapsed().as_micros();
         self.tx.send(EngineMsg::Info(UciInfo {
@@ -72,21 +70,7 @@ impl SearcherSignal for StdSignal {
             pv: vec![best.unwrap()],
         }))
     }
-    fn send_best(&self, best: Option<Move>) -> MsgSend {
-        self.tx.send(EngineMsg::BestMove(best.unwrap()))
-    }
-}
-
-pub struct DisableSendSignal<S>(S);
-impl<S: SearcherSignal> SearcherSignal for DisableSendSignal<S> {
-    #[inline(always)]
-    fn should_stop(&self) -> bool {
-        self.0.should_stop()
-    }
-    fn send_partial(&self, _nodes: u128, _depth: u32, _best: Option<Move>, _score: i16) -> MsgSend {
-        Result::Ok(())
-    }
-    fn send_best(&self, _best: Option<Move>) -> MsgSend {
-        Result::Ok(())
+    fn send_best(&self, best: FoundMv) -> MsgSend {
+        self.tx.send(EngineMsg::BestMove(best.0.unwrap()))
     }
 }

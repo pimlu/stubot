@@ -430,9 +430,7 @@ impl Default for State {
 
 #[cfg(test)]
 mod test {
-    use crate::perft::test::*;
-
-    use super::*;
+    use super::{testpos::*, *};
     use pretty_assertions::assert_eq;
 
     #[test]

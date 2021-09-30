@@ -9,6 +9,7 @@ mod eval;
 mod perft;
 mod rules;
 mod structs;
+pub mod testpos;
 
 use board::*;
 use eval::*;
